@@ -5,7 +5,7 @@
 // order_id. This is the correct way to do Razorpay integration.
 // ---------------------------------------------------------
 
-const API_BASE = 'http://127.0.0.1:5000';
+const API_BASE = '';
 
 function loadScript(src) {
   return new Promise((resolve, reject) => {
