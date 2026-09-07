@@ -683,6 +683,17 @@ p { margin: 0 0 .8em; }
   .footer { margin-top: 24px; }
   .card-box { padding: 18px; }
 }
+.loading-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: var(--serif);
+  font-size: 1.5rem;
+  color: var(--brand);
+  background: var(--cream);
+}
+
 /* ---- Image gallery for product detail ---- */
 .detail-main-img {
   width: 100%;
