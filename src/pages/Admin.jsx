@@ -31,7 +31,7 @@ const emptyForm = {
   paymentMethods: ['upi', 'card', 'cod'],
   returnsAccepted: true,
   returnDays: 7,
-  customImage: '',
+  customImages: [],
 };
 
 export default function Admin() {
@@ -63,27 +63,41 @@ export default function Admin() {
   };
 
   const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setMsg('Please select an image file.');
-      setTimeout(() => setMsg(''), 2500);
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setMsg('Image must be under 5MB.');
-      setTimeout(() => setMsg(''), 2500);
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setForm({ ...form, customImage: ev.target.result });
-    };
-    reader.readAsDataURL(file);
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    let loaded = 0;
+    const newImages = [...form.customImages];
+
+    files.forEach((file) => {
+      if (!file.type.startsWith('image/')) {
+        setMsg('Please select image files only.');
+        setTimeout(() => setMsg(''), 2500);
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setMsg('Each image must be under 5MB.');
+        setTimeout(() => setMsg(''), 2500);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        newImages.push(ev.target.result);
+        loaded++;
+        if (loaded + newImages.length === form.customImages.length + files.length) {
+          setForm({ ...form, customImages: newImages });
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Reset input so same file can be selected again
+    e.target.value = '';
   };
 
-  const clearCustomImage = () => {
-    setForm({ ...form, customImage: '' });
+  const removeImage = (index) => {
+    const newImages = form.customImages.filter((_, i) => i !== index);
+    setForm({ ...form, customImages: newImages });
   };
 
   const submit = (e) => {
@@ -93,12 +107,13 @@ export default function Admin() {
       setTimeout(() => setMsg(''), 2500);
       return;
     }
-    const customImg = form.customImage && form.customImage.trim() !== '' ? form.customImage.trim() : null;
+    const customImgs = form.customImages.filter((img) => img && img.trim() !== '');
     const data = {
       ...form,
       price: Number(form.price),
       mrp: Number(form.mrp) || Math.round(Number(form.price) * 1.25 / 10) * 10,
-      image: customImg || productImage(form.name.toUpperCase(), form.color),
+      image: customImgs.length > 0 ? customImgs[0] : productImage(form.name.toUpperCase(), form.color),
+      images: customImgs.length > 0 ? customImgs : [productImage(form.name.toUpperCase(), form.color)],
       shippingCost: Number(form.shippingCost) || 0,
       returnsAccepted: Boolean(form.returnsAccepted),
       returnDays: form.returnsAccepted ? Math.max(0, Number(form.returnDays) || 0) : 0,
@@ -117,7 +132,6 @@ export default function Admin() {
 
   const startEdit = (p) => {
     setEditingId(p.id);
-    const isCustomImage = p.image && (p.image.startsWith('http') || p.image.startsWith('data:'));
     setForm({
       name: p.name,
       description: p.description,
@@ -131,7 +145,7 @@ export default function Admin() {
       paymentMethods: p.paymentMethods || ['upi', 'card', 'cod'],
       returnsAccepted: p.returnsAccepted ?? true,
       returnDays: p.returnDays ?? 7,
-      customImage: isCustomImage ? p.image : '',
+      customImages: p.images || (p.image ? [p.image] : []),
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };

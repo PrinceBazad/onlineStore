@@ -27,7 +27,7 @@ export default function ProductCard({ product }) {
     <div className="product-card">
       <div className="pc-imgwrap">
         <Link to={`/product/${product.id}`} className="pc-imglink">
-          <img src={product.images?.[0] || product.image} alt={product.name} loading="lazy" />
+          <img src={product.image} alt={product.name} loading="lazy" />
           {soldOut && <span className="ribbon">Sold out</span>}
           {!soldOut && product.shippingCost === 0 && <span className="ribbon free">Free ship</span>}
           {!soldOut && product.shippingCost !== 0 && product.oldPrice ? <span className="ribbon sale">Sale</span> : null}

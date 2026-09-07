@@ -88,7 +88,7 @@ export default function ProductDetail() {
       {toast && <div className="toast">{toast}</div>}
       <div className="detail">
         <div className="detail-img">
-          <img src={product.image} alt={product.name} />
+          <div className="detail-img">{product.images && product.images.length > 0 ? <><img src={product.images[0]} alt={product.name} className="detail-main-img" />{product.images.length > 1 && <div className="detail-thumb-row">{product.images.map((img, idx) => (<button key={idx} className={`detail-thumb ${idx === 0 ? "" : ""}`} onClick={(e) => {e.currentTarget.parentElement.parentElement.querySelector(".detail-main-img").src = img;}}><img src={img} alt={`${product.name} ${idx + 1}`} /></button>))}</div>}</> : <img src={product.image} alt={product.name} className="detail-main-img" />}</div>
         </div>
         <div className="detail-info">
           <p className="cat-line">{product.category}</p>
