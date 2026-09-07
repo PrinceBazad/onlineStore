@@ -1,0 +1,10 @@
+for real money.</span>
+            </label>
+            <label>Payment mode
+              <select value={s.paymentMode || 'demo'} onChange={setSField('paymentMode')}>
+                <option value="demo">Demo (simulated checkout — no real money)</option>
+                <option value="live">Live (real Razorpay popup — requires backend)</option>
+              </select>
+              <span className="muted tiny">Demo mode lets you test the full checkout flow safely. Switch to Live only when you have a backend creating Razorpay orders.</span>
+            </label>
+            {savedMsg

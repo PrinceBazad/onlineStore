@@ -1,0 +1,264 @@
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useCart } from '../context/CartContext.jsx';
+import { useData } from '../context/DataContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
+import { formatINR } from '../utils/format.js';
+import { payWithRazorpay } from '../utils/razorpay.js';
+
+const ALL_PAY_METHODS = [
+  { id: 'upi', label: 'UPI', hint: 'GPay / PhonePe / Paytm / BHIM' },
+  { id: 'card', label: 'Credit / Debit Card', hint: 'Visa, Mastercard, RuPay' },
+  { id: 'cod', label: 'Cash on Delivery', hint: 'Pay in cash at your doorstep' },
+];
+
+export default function Checkout() {
+  const { cart, subtotal, clearCart } = useCart();
+  const { placeOrder, settings, products } = useData();
+  const { user } = useAuth();
+  const nav = useNavigate();
+
+  const [shipping, setShipping] = useState({
+    name: user?.name || '',
+    phone: user?.phone || '',
+    email: user?.email || '',
+    address: '',
+    city: '',
+    state: '',
+    pincode: '',
+  });
+  const [method, setMethod] = useState('');
+  const [paying, setPaying] = useState(false);
+  const [placed, setPlaced] = useState(null);
+  const [err, setErr] = useState('');
+  const [gatewayNotice, setGatewayNotice] = useState('');
+
+  const shippingFee = cart.reduce((sum, c) => {
+    const p = products.find((x) => x.id === c.id);
+    const perUnit = p && typeof p.shippingCost === 'number' ? p.shippingCost : 99;
+    return sum + perUnit * c.qty;
+  }, 0);
+  const total = subtotal + shippingFee;
+
+  const availableMethods = ALL_PAY_METHODS.filter((m) =>
+    cart.every((c) => {
+      const p = products.find((x) => x.id === c.id);
+      const accepted = p && Array.isArray(p.paymentMethods) ? p.paymentMethods : ['upi', 'card', 'cod'];
+      return accepted.includes(m.id);
+    })
+  );
+
+  const gatewayConfigured = Boolean(settings.razorpayKeyId);
+  const activeMethod = availableMethods.find((m) => m.id === method) ? method : (availableMethods[0]?.id || '');
+  const pmode = settings.paymentMode || 'demo';
+
+  const payText = (p) => {
+    if (p?.method === 'cod') return 'Cash on Delivery';
+    if (p?.gateway === 'Demo') return 'Demo payment - no real money charged';
+    if (p?.status === 'pending') return 'Online payment pending';
+    return p ? 'Paid online via ' + (p.gateway || 'Razorpay') + (p.mode ? ' (' + p.mode + ')' : '') : '';
+  };
+
+  if (cart.length === 0 && !placed) {
+    return (
+      <main className="page center">
+        <p>Your cart is empty.</p>
+        <Link to="/catalog" className="btn btn-dark">Browse products</Link>
+      </main>
+    );
+  }
+
+  if (placed) {
+    return (
+      <main className="page center">
+        <div className="card-box">
+          <div className="ok" style={{ fontSize: 48 }}>OK</div>
+          <h2>Order placed successfully!</h2>
+          <p><strong>Order ID:</strong> {placed.id}</p>
+          <p><strong>Payment:</strong> {payText(placed.payment)}</p>
+          <p><strong>Total paid:</strong> {formatINR(placed.total)}</p>
+          {gatewayNotice && <p className="error" style={{ marginTop: 10 }}>{gatewayNotice}</p>}
+          <div className="pay-methods">
+            <button className="btn btn-dark" onClick={() => nav('/')}>Continue shopping</button>
+            <button className="btn btn-gold" onClick={() => nav('/track')}>Track order</button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  const setShip = (k) => (e) => setShipping({ ...shipping, [k]: e.target.value });
+
+  const validate = () => {
+    for (const k of ['name', 'phone', 'address', 'city', 'state', 'pincode']) {
+      if (!shipping[k].trim()) return 'Please fill all shipping details.';
+    }
+    if (!/^\d{6}$/.test(shipping.pincode)) return 'Enter a valid 6-digit pincode.';
+    return '';
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setErr('');
+    setGatewayNotice('');
+    const v = validate();
+    if (v) return setErr(v);
+
+    const baseOrder = {
+      userId: user?.id || null,
+      items: cart,
+      customer: { name: shipping.name, phone: shipping.phone, email: shipping.email },
+      shipping: { address: shipping.address, city: shipping.city, state: shipping.state, pincode: shipping.pincode },
+      subtotal, shippingFee, total,
+    };
+
+    if (activeMethod === 'cod') {
+      const payment = { method: 'cod', status: 'pending', mode: 'Cash on Delivery' };
+      const order = placeOrder({ ...baseOrder, payment });
+      clearCart();
+      setPlaced(order);
+      return;
+    }
+
+    // Simulated online payment (used by Demo mode & Auto fallback). No Razorpay call.
+    const simulatePayment = () => {
+      const payment = {
+        method: 'online',
+        gateway: 'Demo',
+        status: 'paid',
+        mode: activeMethod === 'upi' ? 'UPI' : 'Card',
+        ref: 'DEMO-' + Date.now().toString(36).toUpperCase(),
+      };
+      const order = placeOrder({ ...baseOrder, payment });
+      clearCart();
+      setPlaced(order);
+    };
+
+    // Payment mode from Admin -> Settings:
+    //   demo -> always simulate (no Razorpay, no real money)
+    //   auto -> try Razorpay, fall back to demo payment on failure
+    //   live -> Razorpay only (real money)
+    if (pmode === 'demo') {
+      setPaying(true);
+      await new Promise((r) => setTimeout(r, 1200));
+      simulatePayment();
+      setPaying(false);
+      return;
+    }
+
+    if (!gatewayConfigured) {
+      if (pmode === 'auto') {
+        setPaying(true);
+        await new Promise((r) => setTimeout(r, 900));
+        simulatePayment();
+        setPaying(false);
+        setGatewayNotice("Razorpay isn't configured yet, so this test order was completed as a demo payment — no money was charged.");
+        return;
+      }
+      setErr('Payment gateway not configured. Add the Razorpay Key ID in Admin > Settings.');
+      return;
+    }
+
+    setPaying(true);
+    try {
+      const response = await payWithRazorpay({
+        key: settings.razorpayKeyId,
+        amount: total,
+        name: settings.storeName,
+        mode: activeMethod === 'upi' ? 'UPI' : 'Card',
+        prefill: { name: shipping.name, email: shipping.email, contact: shipping.phone },
+      });
+      const payment = {
+        method: 'online',
+        gateway: 'Razorpay',
+        status: 'paid',
+        mode: activeMethod === 'upi' ? 'UPI' : 'Card',
+        ref: response.razorpay_payment_id,
+      };
+      const order = placeOrder({ ...baseOrder, payment });
+      clearCart();
+      setPlaced(order);
+    } catch (ex) {
+      if (pmode === 'auto') {
+        await new Promise((r) => setTimeout(r, 600));
+        simulatePayment();
+        setGatewayNotice("Payment gateway couldn't complete the payment (" + (ex.message || 'gateway error') + ") — this test order was recorded as a demo payment. No money was charged.");
+      } else {
+        setErr(ex.message || 'Payment failed. Please try again.');
+      }
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  return (
+    <main className="page checkout">
+      <form id="checkout-form" onSubmit={submit} className="co-left">
+        <section className="card-box">
+          <h2>1. Shipping details</h2>
+          <div className="grid2">
+            <label>Full name<input value={shipping.name} onChange={setShip('name')} /></label>
+            <label>Phone<input value={shipping.phone} onChange={setShip('phone')} /></label>
+          </div>
+          <label>Email<input type="email" value={shipping.email} onChange={setShip('email')} /></label>
+          <label>Address<input value={shipping.address} onChange={setShip('address')} placeholder="House no, street, area" /></label>
+          <div className="grid3">
+            <label>City<input value={shipping.city} onChange={setShip('city')} /></label>
+            <label>State<input value={shipping.state} onChange={setShip('state')} /></label>
+            <label>Pincode<input value={shipping.pincode} onChange={setShip('pincode')} maxLength={6} /></label>
+          </div>
+        </section>
+
+        <section className="card-box">
+          <h2>2. Payment method</h2>
+          {activeMethod !== 'cod' && (
+            <div className={"mode-badge " + pmode}>
+              {pmode === 'demo' && 'DEMO MODE — simulated payment, no money charged'}
+              {pmode === 'auto' && 'AUTO MODE — tries Razorpay, falls back to demo'}
+              {pmode === 'live' && 'LIVE MODE — real Razorpay payment'}
+            </div>
+          )}
+          <div className="pay-methods">
+            {availableMethods.map((m) => (
+              <label key={m.id} className={"pay-opt " + (activeMethod === m.id ? "active" : "")}>
+                <input type="radio" name="pay" checked={activeMethod === m.id}
+                  onChange={() => setMethod(m.id)} />
+                <div><strong>{m.label}</strong><span>{m.hint}</span></div>
+              </label>
+            ))}
+          </div>
+          {activeMethod === 'upi' && <p className="muted">Pay securely via UPI (GPay, PhonePe, Paytm, BHIM).</p>}
+          {activeMethod === 'card' && <p className="muted">Pay securely via card inside the Razorpay window.</p>}
+          {activeMethod === 'cod' && <p className="muted">Keep exact change ready at delivery.</p>}
+          {activeMethod !== 'cod' && pmode === 'demo' && <p className="muted">Demo mode is ON - online payment is simulated, no real money is charged.</p>}
+          {activeMethod !== 'cod' && pmode === 'auto' && <p className="muted">Auto mode: tries Razorpay first, falls back to a demo payment if it fails.</p>}
+          {activeMethod !== 'cod' && pmode === 'live' && !gatewayConfigured && <p className="error">Payment gateway not configured.</p>}
+          {activeMethod !== 'cod' && pmode === 'live' && gatewayConfigured && <p className="ok tiny">Secure online payment via Razorpay.</p>}
+        </section>
+      </form>
+
+      <aside className="co-right">
+        <div className="card-box sticky">
+          <h2>Order summary</h2>
+          <ul className="sum-items">
+            {cart.map((c) => (
+              <li key={c.id}>
+                <span>{c.name} x {c.qty}</span>
+                <span>{formatINR(c.price * c.qty)}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="sum-lines">
+            <div><span>Subtotal</span><span>{formatINR(subtotal)}</span></div>
+            <div><span>Shipping</span><span>{shippingFee === 0 ? 'FREE' : formatINR(shippingFee)}</span></div>
+            <div className="total"><span>Total</span><span>{formatINR(total)}</span></div>
+          </div>
+          {err && <p className="error">{err}</p>}
+          <button form="checkout-form" className="btn btn-gold btn-block" type="submit" disabled={paying || !activeMethod}>
+            {paying ? 'Processing...' : activeMethod === 'cod' ? 'Place order - COD' : 'Pay & place order'}
+          </button>
+        </div>
+      </aside>
+    </main>
+  );
+}
