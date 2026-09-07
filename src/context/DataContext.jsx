@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { db } from '../db.js';
+import { listenFromFirestore } from '../db.js';
 
 const DataContext = createContext(null);
 
@@ -14,7 +15,8 @@ export function DataProvider({ children }) {
     setSettings(next);
     db.saveSettings(next);
   };
-// Keep every open tab in sync when settings/data change in another tab
+
+  // Keep every open tab in sync when settings/data change in another tab
   // (e.g. switching payment mode in Admin should apply to the checkout tab instantly).
   useEffect(() => {
     const onStorage = (e) => {
@@ -24,6 +26,21 @@ export function DataProvider({ children }) {
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  // Sync across devices via Firestore
+  useEffect(() => {
+    const unsubProducts = listenFromFirestore('baani_products', setProducts);
+    const unsubOrders = listenFromFirestore('baani_orders', setOrders);
+    const unsubSettings = listenFromFirestore('baani_settings', setSettings);
+    const unsubReviews = listenFromFirestore('baani_reviews', setReviews);
+
+    return () => {
+      unsubProducts();
+      unsubOrders();
+      unsubSettings();
+      unsubReviews();
+    };
   }, []);
 
   // ----- reviews -----

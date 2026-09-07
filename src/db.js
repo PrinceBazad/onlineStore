@@ -1,7 +1,10 @@
 // ─────────────────────────────────────────────────────────────
 // db.js — localStorage persistence layer for the whole store.
 // Provides a tiny synchronous "database" with seeding support.
+// Syncs to Firebase Firestore for cross-device consistency.
 // ─────────────────────────────────────────────────────────────
+
+import { initFirebase, isFirebaseReady, firestoreSet, firestoreGet, firestoreListen } from './firebase.js';
 
 const KEYS = {
   users: 'baani_users',
@@ -13,6 +16,28 @@ const KEYS = {
   wishlist: 'baani_wishlist',
   reviews: 'baani_reviews',
 };
+
+// Initialize Firebase (non-blocking)
+initFirebase();
+
+// Sync helpers - write to Firestore when localStorage changes
+function syncToFirestore(key, data) {
+  if (!isFirebaseReady()) return;
+  const collection = key.replace('baani_', '');
+  firestoreSet('store', collection, { data, updatedAt: Date.now() });
+}
+
+// Listen for Firestore changes and update localStorage
+export function listenFromFirestore(key, callback) {
+  if (!isFirebaseReady()) return;
+  const collection = key.replace('baani_', '');
+  firestoreListen('store', collection, (docData) => {
+    if (docData && docData.data) {
+      localStorage.setItem(key, JSON.stringify(docData.data));
+      callback(docData.data);
+    }
+  });
+}
 
 // ---- generic helpers ----------------------------------------
 function read(key, fallback) {
@@ -156,6 +181,7 @@ export const db = {
   },
   saveUsers(u) {
     write(KEYS.users, u);
+    syncToFirestore(KEYS.users, u);
   },
 
   getProducts() {
@@ -168,6 +194,7 @@ export const db = {
   },
   saveProducts(p) {
     write(KEYS.products, p);
+    syncToFirestore(KEYS.products, p);
   },
 
   getOrders() {
@@ -175,6 +202,7 @@ export const db = {
   },
   saveOrders(o) {
     write(KEYS.orders, o);
+    syncToFirestore(KEYS.orders, o);
   },
 
   getSession() {
@@ -203,6 +231,7 @@ export const db = {
   },
   saveSettings(s) {
     write(KEYS.settings, s);
+    syncToFirestore(KEYS.settings, s);
   },
 
   // wishlist stored as map: { [userId]: [productId, ...] }
@@ -211,6 +240,7 @@ export const db = {
   },
   saveWishlists(w) {
     write(KEYS.wishlist, w);
+    syncToFirestore(KEYS.wishlist, w);
   },
 
   // reviews stored as array of objects
@@ -219,6 +249,7 @@ export const db = {
   },
   saveReviews(r) {
     write(KEYS.reviews, r);
+    syncToFirestore(KEYS.reviews, r);
   },
 
   uid,
