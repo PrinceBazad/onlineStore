@@ -17,10 +17,11 @@ export default function Login() {
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
+    setErr('');
     try {
-      login(form);
+      await login(form);
       nav(from, { replace: true });
     } catch (ex) {
       setErr(ex.message);

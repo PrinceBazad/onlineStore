@@ -64,7 +64,7 @@ export default function Navbar({ onCartOpen }) {
           {user ? (
             <div className="user-menu">
               <span className="user-chip">Hi, {user.name.split(' ')[0]}</span>
-              <button className="linklike" onClick={logout}>
+              <button className="linklike" onClick={() => { logout(); }}>
                 Logout
               </button>
             </div>

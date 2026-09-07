@@ -10,7 +10,7 @@ export default function Signup() {
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     setErr('');
     if (form.password !== form.confirm) {
@@ -22,7 +22,7 @@ export default function Signup() {
       return;
     }
     try {
-      signup(form);
+      await signup(form);
       nav('/', { replace: true });
     } catch (ex) {
       setErr(ex.message);
