@@ -118,12 +118,8 @@ export function AuthProvider({ children }) {
 
   const isAdmin = user?.role === 'admin';
 
-  if (loading) {
-    return <div className="loading-screen">Loading...</div>;
-  }
-
   return (
-    <AuthContext.Provider value={{ user, isAdmin, signup, login, logout }}>
+    <AuthContext.Provider value={{ user, isAdmin, signup, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );
