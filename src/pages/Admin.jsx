@@ -194,25 +194,47 @@ export default function Admin() {
 
               {/* ── Image: URL or file upload ─────────────────── */}
               <div className="image-upload-section">
-                <label>Product image — URL
-                  <input
-                    value={form.customImage.startsWith('data:') ? '' : form.customImage}
-                    onChange={(e) => setForm({ ...form, customImage: e.target.value })}
-                    placeholder="https://example.com/image.jpg"
-                  />
-                  <span className="muted tiny">Paste any image URL. Upload a file below to auto-replace it.</span>
+                <label>Product images (up to 5)
+                  <span className="muted tiny">Upload up to 5 images. First image will be the main image.</span>
                 </label>
-                <div className="image-upload-or">OR</div>
-                <label className="image-upload-btn">
-                  <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
-                  <span>📁 Upload photo from device</span>
-                </label>
-                {form.customImage && form.customImage.trim() !== '' && (
-                  <div className="image-preview-row">
-                    <img src={form.customImage} alt="Preview" className="image-preview-thumb" />
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={clearCustomImage}>✕ Remove</button>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageUpload}
+                  disabled={form.customImages.length >= 5}
+                />
+                {form.customImages.length > 0 && (
+                  <div className="img-preview-grid">
+                    {form.customImages.map((img, idx) => (
+                      <div key={idx} className="img-preview-item">
+                        <img src={img} alt={`Preview ${idx + 1}`} />
+                        {idx === 0 && <span className="img-badge">Main</span>}
+                        <button type="button" className="btn btn-sm danger remove-img" onClick={() => removeImage(idx)}>
+                          ✕
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 )}
+                <label>Or paste image URL
+                  <input
+                    onBlur={(e) => {
+                      const url = e.target.value.trim();
+                      if (url && (url.startsWith("http") || url.startsWith("data:"))) {
+                        setForm({ ...form, customImages: [...form.customImages, url] });
+                        e.target.value = "";
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        e.target.blur();
+                      }
+                    }}
+                    placeholder="https://example.com/image.jpg — press Enter to add"
+                  />
+                </label>
               </div>
 
               <div className="grid3">
@@ -447,3 +469,4 @@ export default function Admin() {
       </main>
   );
 }
+
