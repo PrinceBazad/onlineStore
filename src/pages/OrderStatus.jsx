@@ -12,10 +12,9 @@ export default function OrderStatus() {
   const [order, setOrder] = useState(null);
   const [notFound, setNotFound] = useState(false);
 
-  if (!user) {
-    return <Navigate to="/login" replace state={{ from: '/track' }} />;
-  }
-
+  // NOTE: all hooks MUST be called on every render — React forbids
+  // returning early before a hook (error #300). The auth redirect below
+  // is therefore placed AFTER every useState/useEffect call.
   useEffect(() => {
     const q = params.get('order');
     if (q) {
@@ -26,6 +25,10 @@ export default function OrderStatus() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params]);
+
+  if (!user) {
+    return <Navigate to="/login" replace state={{ from: '/track' }} />;
+  }
 
   const search = (e) => {
     e.preventDefault();
