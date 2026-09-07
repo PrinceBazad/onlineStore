@@ -63,35 +63,47 @@ export default function Admin() {
   };
 
   const handleImageUpload = (e) => {
-    const files = Array.from(e.target.files);
+    const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    let loaded = 0;
-    const newImages = [...form.customImages];
+    const MAX = 5;
+    const accepted = files.filter(
+      (file) => file.type.startsWith('image/') && file.size <= 5 * 1024 * 1024
+    );
 
-    files.forEach((file) => {
-      if (!file.type.startsWith('image/')) {
-        setMsg('Please select image files only.');
-        setTimeout(() => setMsg(''), 2500);
+    if (accepted.length !== files.length) {
+      setMsg('Only image files under 5MB are allowed.');
+      setTimeout(() => setMsg(''), 2500);
+      if (accepted.length === 0) {
+        e.target.value = '';
         return;
       }
-      if (file.size > 5 * 1024 * 1024) {
-        setMsg('Each image must be under 5MB.');
-        setTimeout(() => setMsg(''), 2500);
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        newImages.push(ev.target.result);
-        loaded++;
-        if (loaded + newImages.length === form.customImages.length + files.length) {
-          setForm({ ...form, customImages: newImages });
+    }
+
+    const readAsDataURL = async (file) => {
+      const buf = await file.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let bin = '';
+      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      return 'data:' + file.type + ';base64,' + btoa(bin);
+    };
+
+    Promise.all(accepted.map(readAsDataURL))
+      .then((urls) => {
+        const room = Math.max(0, MAX - form.customImages.length);
+        const next = [...form.customImages, ...urls.slice(0, room)];
+        setForm({ ...form, customImages: next });
+        if (urls.length > room) {
+          setMsg('Maximum 5 images allowed. Extra images were skipped.');
+          setTimeout(() => setMsg(''), 2500);
         }
-      };
-      reader.readAsDataURL(file);
-    });
+      })
+      .catch(() => {
+        setMsg('Failed to read the selected image file(s).');
+        setTimeout(() => setMsg(''), 2500);
+      });
 
-    // Reset input so same file can be selected again
+    // Reset input so the same file can be selected again
     e.target.value = '';
   };
 
@@ -238,8 +250,8 @@ export default function Admin() {
               </div>
 
               <div className="grid3">
-                <label>Price (â‚¹)<input type="number" min="0" value={form.price} onChange={set('price')} required /></label>
-                <label>MRP (â‚¹)<input type="number" min="0" value={form.mrp} onChange={set('mrp')} placeholder="Optional" /></label>
+                <label>Price (₹)<input type="number" min="0" value={form.price} onChange={set('price')} required /></label>
+                <label>MRP (₹)<input type="number" min="0" value={form.mrp} onChange={set('mrp')} placeholder="Optional" /></label>
                 <label>Stock<input type="number" min="0" value={form.stock} onChange={set('stock')} /></label>
               </div>
               <div className="grid2">
@@ -249,9 +261,9 @@ export default function Admin() {
                   Show as featured product
                 </label>
               </div>
-              {/* â”€â”€ Shipping cost â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+              {/* ── Shipping cost ─────────────────────────── */}
               <div className="grid2">
-                <label>Shipping cost per unit (â‚¹)
+                <label>Shipping cost per unit (₹)
                   <input
                     type="number"
                     min="0"
@@ -279,7 +291,7 @@ export default function Admin() {
                 </div>
               </div>
 
-              {/* â”€â”€ Returns â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+              {/* ── Returns ───────────────────────────────── */}
               <div className="return-box">
                 <label className="check">
                   <input
@@ -331,7 +343,7 @@ export default function Admin() {
                       <td>{p.category}</td>
                       <td>{formatINR(p.price)}</td>
                       <td>{p.stock}</td>
-                      <td>{p.featured ? 'â˜…' : 'â€”'}</td>
+                      <td>{p.featured ? '★' : '—'}</td>
                       <td className="row-gap">
                         <button className="btn btn-sm" onClick={() => startEdit(p)}>Edit</button>
                         <button className="btn btn-sm danger" onClick={() => deleteProduct(p.id)}>Delete</button>
@@ -357,15 +369,15 @@ export default function Admin() {
                     <strong>Order {o.id}</strong>
                     <span className="muted">{formatDateTime(o.orderDate)}</span>
                     <span className={`status-badge ${o.status}`}>{o.status.toUpperCase()}</span>
-                    <span className="ord-total">{formatINR(o.total)} Â· {o.payment.mode}</span>
+                    <span className="ord-total">{formatINR(o.total)} · {o.payment.mode}</span>
                   </div>
                   <div className="ord-body">
                     <div>
-                      <p className="muted">{o.customer?.name} Â· {o.customer?.phone}</p>
-                      <p className="muted">{o.shipping?.address}, {o.shipping?.city} â€” {o.shipping?.pincode}</p>
+                      <p className="muted">{o.customer?.name} · {o.customer?.phone}</p>
+                      <p className="muted">{o.shipping?.address}, {o.shipping?.city} — {o.shipping?.pincode}</p>
                       <ul className="sum-items">
                         {o.items.map((it) => (
-                          <li key={it.id}><span>{it.name} Ã— {it.qty}</span></li>
+                          <li key={it.id}><span>{it.name} × {it.qty}</span></li>
                         ))}
                       </ul>
                     </div>
@@ -413,10 +425,6 @@ export default function Admin() {
             <label>Hero subheading (home page)
               <input value={s.heroSubheading} onChange={setSField('heroSubheading')} />
             </label>
-            <label>Free shipping threshold (â‚¹)
-              <input type="number" min="0" value={s.freeShippingThreshold || 0} onChange={setSField('freeShippingThreshold')} placeholder="1499" />
-              <span className="muted tiny">Orders at or above this amount get free shipping. Set to 0 to disable.</span>
-            </label>
             <div className="grid2">
               <label>Contact phone
                 <input value={s.contactPhone} onChange={setSField('contactPhone')} />
@@ -433,7 +441,7 @@ export default function Admin() {
               <input value={s.razorpayKeyId || ''} onChange={setSField('razorpayKeyId')} placeholder="rzp_test_XXXX / rzp_live_XXXX" />
               <span className="muted tiny">Used to accept live UPI & card payments via Razorpay. Use a TEST key for sandbox or your LIVE key for real money.</span>
             </label>
-            <label>Free shipping threshold (â‚¹)
+            <label>Free shipping threshold (₹)
               <input type="number" min="0" value={s.freeShippingThreshold || 0} onChange={setSField('freeShippingThreshold')} placeholder="1499" />
               <span className="muted tiny">Orders at or above this amount get free shipping. Per-product shipping fees still apply below this threshold.</span>
             </label>
@@ -441,9 +449,9 @@ export default function Admin() {
               <label style={{ display: 'block', marginBottom: 4 }}>Payment mode</label>
               <div className="pay-mode-options">
                 {[
-                  { id: 'demo', label: 'Demo', desc: 'Simulated payments â€” no real money' },
+                  { id: 'demo', label: 'Demo', desc: 'Simulated payments — no real money' },
                   { id: 'auto', label: 'Auto', desc: 'Try Razorpay, fall back to demo' },
-                  { id: 'live', label: 'Live', desc: 'Real payments only â€” no fallback' },
+                  { id: 'live', label: 'Live', desc: 'Real payments only — no fallback' },
                 ].map((opt) => (
                   <label key={opt.id} className={`pay-mode-opt ${(s.paymentMode || 'demo') === opt.id ? 'active' : ''}`}>
                     <input
