@@ -6,12 +6,6 @@ import { formatINR, formatDateTime } from '../utils/format.js';
 import { productImage } from '../db.js';
 
 const CATS = ['Suits', 'Ethnic', 'Lehenga', 'Saree', 'Daily Wear'];
-const NEXT_STATUS = {
-  placed: ['confirmed', 'Confirmed'],
-  confirmed: ['shipped', 'Shipped'],
-  shipped: ['delivered', 'Delivered'],
-};
-
 const ALL_PAY = [
   { id: 'upi', label: 'UPI' },
   { id: 'card', label: 'Card' },
@@ -382,28 +376,28 @@ export default function Admin() {
                       </ul>
                     </div>
                     <div className="ord-actions">
-                      {NEXT_STATUS[o.status] ? (
-                        <button
-                          className="btn btn-sm"
-                          onClick={() => updateOrderStatus(o.id, NEXT_STATUS[o.status][0], NEXT_STATUS[o.status][1])}
-                        >
-                          Mark as {NEXT_STATUS[o.status][1]}
-                        </button>
-                      ) : (
-                        <span className="muted">Completed</span>
-                      )}
-                      {o.status !== 'cancelled' && o.status !== 'delivered' && (
-                        <button
-                          className="btn btn-sm btn-danger"
-                          onClick={() => {
-                            if (window.confirm(`Cancel order ${o.id}? This cannot be undone.`)) {
-                              updateOrderStatus(o.id, 'cancelled', 'Cancelled');
+                      <label className="ord-status-set">
+                        <span className="muted">Status:</span>
+                        <select
+                          value={o.status}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === o.status) return;
+                            const label = val.charAt(0).toUpperCase() + val.slice(1);
+                            if (val === 'cancelled' && !window.confirm(`Cancel order ${o.id}? This cannot be undone.`)) {
+                              e.target.value = o.status;
+                              return;
                             }
+                            updateOrderStatus(o.id, val, label);
                           }}
                         >
-                          Cancel order
-                        </button>
-                      )}
+                          <option value="placed">Placed</option>
+                          <option value="confirmed">Confirmed</option>
+                          <option value="shipped">Shipped</option>
+                          <option value="delivered">Delivered</option>
+                          <option value="cancelled">Cancelled</option>
+                        </select>
+                      </label>
                       {o.status === 'cancelled' && <span className="muted">Cancelled</span>}
                     </div>
                   </div>
