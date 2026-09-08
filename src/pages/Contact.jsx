@@ -1,46 +1,73 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { Link } from 'react-router-dom';
 import { useData } from '../context/DataContext.jsx';
 
 export default function Contact() {
-  const { settings, addMessage } = useData();
-  const [sent, setSent] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', message: '' });
-  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
-
-  const submit = (e) => {
-    e.preventDefault();
-    addMessage({ name: form.name, email: form.email, message: form.message });
-    setSent(true);
-  };
+  const { settings } = useData();
+  const name = settings.storeName || 'our store';
 
   return (
     <main className="page">
       <div className="page-head">
         <h1>Contact Us</h1>
-        <p>We'd love to hear from you</p>
+        <p>We're always happy to help — reach us anytime, no form needed</p>
       </div>
 
       <div className="contact-grid">
-        <section className="card-box">
-          <h2>Get in touch</h2>
-          {sent ? (
-            <p className="ok">✅ Thank you! We'll get back to you within 24 hours.</p>
-          ) : (
-            <form onSubmit={submit} className="form">
-              <label>Name<input value={form.name} onChange={set('name')} required /></label>
-              <label>Email<input type="email" value={form.email} onChange={set('email')} required /></label>
-              <label>Message<textarea rows="5" value={form.message} onChange={set('message')} required /></label>
-              <button className="btn btn-gold" type="submit">Send message</button>
-            </form>
-          )}
-        </section>
-        <aside className="card-box">
-          <h2>Store information</h2>
-          <p><strong>📍 Address</strong><br />{settings.contactAddress}</p>
-          <p><strong>📞 Phone</strong><br />{settings.contactPhone}</p>
-          <p><strong>✉️ Email</strong><br />{settings.contactEmail}</p>
-          <p><strong>🕘 Hours</strong><br />Mon – Sat · 10:00 AM – 8:00 PM</p>
+        <aside className="card-box contact-info">
+          <h2>Reach us directly</h2>
+          <p><strong>📞 Phone / WhatsApp</strong><br />
+            <a href={`tel:${settings.contactPhone}`}>{settings.contactPhone}</a>
+            <span className="muted tiny"> — fastest way to get an answer</span>
+          </p>
+          <p><strong>✉️ Email</strong><br />
+            <a href={`mailto:${settings.contactEmail}`}>{settings.contactEmail}</a>
+            <span className="muted tiny"> — we reply within 24 hours</span>
+          </p>
+          <p><strong>📍 Visit the store</strong><br />{settings.contactAddress}</p>
+          <p><strong>🕘 Opening hours</strong><br />Mon – Sat · 10:00 AM – 8:00 PM<br />Sunday · Closed</p>
         </aside>
+
+        <div>
+          <section className="card-box">
+            <h2>How can we help?</h2>
+            <ul className="help-list">
+              <li><strong>Order status &amp; tracking</strong> — use the Track Order page with your order ID, or call us with your order number.</li>
+              <li><strong>Returns &amp; exchanges</strong> — {settings.returnsAccepted !== false ? `easy returns within ${settings.returnDays || 7} days of delivery. Keep the tags on and message us.` : 'Please contact us to discuss your order.'}</li>
+              <li><strong>Product questions</strong> — sizing, fabric, colour availability — we know every piece in the store.</li>
+              <li><strong>Bulk &amp; occasion orders</strong> — weddings, festivals, family functions — ask about special pricing.</li>
+            </ul>
+          </section>
+
+          <section className="card-box">
+            <h2>Quick answers</h2>
+            <details>
+              <summary>How do I track my order?</summary>
+              <p className="muted">Go to the Track Order page and enter the order ID from your confirmation. You'll see live status — placed, confirmed, shipped, delivered.</p>
+            </details>
+            <details>
+              <summary>What payment methods do you accept?</summary>
+              <p className="muted">{name} accepts UPI, all major cards, and Cash on Delivery (where available). Payments are processed securely.</p>
+            </details>
+            <details>
+              <summary>Can I return or exchange an item?</summary>
+              <p className="muted">{settings.returnsAccepted !== false ? `Yes — returns are accepted within ${settings.returnDays || 7} days of delivery. The item must be unused with original tags attached.` : 'Please contact us directly to discuss returns for your order.'}</p>
+            </details>
+            <details>
+              <summary>Do you ship across India?</summary>
+              <p className="muted">Yes, we ship pan-India. Shipping is free on orders above ₹{settings.freeShippingThreshold || 1499}.</p>
+            </details>
+          </section>
+
+          <section className="card-box contact-cta">
+            <h2>Ready to shop?</h2>
+            <p className="muted">Browse the latest arrivals at {name} — new pieces added regularly.</p>
+            <div className="contact-cta-btns">
+              <Link className="btn btn-gold" to="/catalog">Shop the collection</Link>
+              <Link className="btn btn-ghost" to="/track">Track an order</Link>
+            </div>
+          </section>
+        </div>
       </div>
     </main>
   );
