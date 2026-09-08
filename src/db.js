@@ -7,15 +7,15 @@
 import { initFirebase, isFirebaseReady, firestoreSet, firestoreGet, firestoreListen } from './firebase.js';
 
 const KEYS = {
-  users: 'baani_users',
-  products: 'baani_products',
-  orders: 'baani_orders',
-  session: 'baani_session',
-  cart: 'baani_cart',
-  settings: 'baani_settings',
-  wishlist: 'baani_wishlist',
-  reviews: 'baani_reviews',
-  messages: 'baani_messages',
+  users: 'houselaxmicloth_users',
+  products: 'houselaxmicloth_products',
+  orders: 'houselaxmicloth_orders',
+  session: 'houselaxmicloth_session',
+  cart: 'houselaxmicloth_cart',
+  settings: 'houselaxmicloth_settings',
+  wishlist: 'houselaxmicloth_wishlist',
+  reviews: 'houselaxmicloth_reviews',
+  messages: 'houselaxmicloth_messages',
 };
 
 // Initialize Firebase (non-blocking)
@@ -24,14 +24,14 @@ initFirebase();
 // Sync helpers - write to Firestore when localStorage changes
 function syncToFirestore(key, data) {
   if (!isFirebaseReady()) return;
-  const collection = key.replace('baani_', '');
+  const collection = key.replace('houselaxmicloth_', '');
   firestoreSet('store', collection, { data, updatedAt: Date.now() });
 }
 
 // Listen for Firestore changes and update localStorage
 export function listenFromFirestore(key, callback) {
   if (!isFirebaseReady()) return;
-  const collection = key.replace('baani_', '');
+  const collection = key.replace('houselaxmicloth_', '');
   firestoreListen('store', collection, (docData) => {
     if (docData && docData.data) {
       localStorage.setItem(key, JSON.stringify(docData.data));
@@ -140,7 +140,7 @@ function seedUsers() {
     {
       id: 'U-admin',
       name: 'Store Admin',
-      email: 'admin@baani.store',
+      email: 'admin@houselaxmicloth.store',
       // password stored plainly for demo purposes (hint only)
       password: 'admin123',
       role: 'admin',
@@ -150,7 +150,7 @@ function seedUsers() {
 
 // ---- Default site settings ---------------------------------
 const DEFAULT_SETTINGS = {
-  storeName: 'Baani Suit Collection',
+  storeName: 'Houselaxmicloth Suit Collection',
      logoUrl: null,
    logoWidth: 40,
    logoLetter: 'B',
@@ -160,7 +160,7 @@ const DEFAULT_SETTINGS = {
   heroSubheading:
     'Heavy 3D work, rich zari, finest fabrics — made for your special days.',
   contactPhone: '+91 98765 43210',
-  contactEmail: 'support@baani.store',
+  contactEmail: 'support@houselaxmicloth.store',
   contactAddress:
     'Najafgarh Road, Near Balour More, Opp. Sector 9, Bahadurgarh — 124507',
   // Razorpay merchant key. Use a TEST key for the sandbox,

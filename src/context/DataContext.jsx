@@ -21,11 +21,11 @@ export function DataProvider({ children }) {
   // (e.g. switching payment mode in Admin should apply to the checkout tab instantly).
   useEffect(() => {
     const onStorage = (e) => {
-      if (e.key === 'baani_settings') setSettings(db.getSettings());
-      else if (e.key === 'baani_products') setProducts(db.getProducts());
-      else if (e.key === 'baani_orders') setOrders(db.getOrders());
-      else if (e.key === 'baani_reviews') setReviews(db.getReviews());
-      else if (e.key === 'baani_messages') setMessages(db.getMessages());
+      if (e.key === 'houselaxmicloth_settings') setSettings(db.getSettings());
+      else if (e.key === 'houselaxmicloth_products') setProducts(db.getProducts());
+      else if (e.key === 'houselaxmicloth_orders') setOrders(db.getOrders());
+      else if (e.key === 'houselaxmicloth_reviews') setReviews(db.getReviews());
+      else if (e.key === 'houselaxmicloth_messages') setMessages(db.getMessages());
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
@@ -33,11 +33,11 @@ export function DataProvider({ children }) {
 
   // Sync across devices via Firestore
   useEffect(() => {
-    const unsubProducts = listenFromFirestore('baani_products', setProducts);
-    const unsubOrders = listenFromFirestore('baani_orders', setOrders);
-    const unsubSettings = listenFromFirestore('baani_settings', setSettings);
-    const unsubReviews = listenFromFirestore('baani_reviews', setReviews);
-    const unsubMessages = listenFromFirestore('baani_messages', setMessages);
+    const unsubProducts = listenFromFirestore('houselaxmicloth_products', setProducts);
+    const unsubOrders = listenFromFirestore('houselaxmicloth_orders', setOrders);
+    const unsubSettings = listenFromFirestore('houselaxmicloth_settings', setSettings);
+    const unsubReviews = listenFromFirestore('houselaxmicloth_reviews', setReviews);
+    const unsubMessages = listenFromFirestore('houselaxmicloth_messages', setMessages);
 
     return () => {
       unsubProducts();

@@ -3,7 +3,7 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const DEMO = [
-  { label: 'Admin', email: 'admin@baani.store', pass: 'admin123' },
+  { label: 'Admin', email: 'admin@houselaxmicloth.store', pass: 'admin123' },
 ];
 
 export default function Login() {
