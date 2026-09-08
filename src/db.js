@@ -122,6 +122,9 @@ function seedProducts() {
     stock: i % 4 === 2 ? 0 : 20 + i * 5,
     color: PALETTE[i % PALETTE.length],
     image: productImage(n[0].toUpperCase(), PALETTE[i % PALETTE.length]),
+    images: [productImage(n[0].toUpperCase(), PALETTE[i % PALETTE.length])],
+    
+    images: [productImage(n[0].toUpperCase(), PALETTE[i % PALETTE.length])],
     featured: i < 6,
     shippingCost: shipCosts[i],
     paymentMethods: payMethods[i],

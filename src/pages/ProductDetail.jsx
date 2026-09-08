@@ -21,7 +21,21 @@ export default function ProductDetail() {
   const [comment, setComment] = useState('');
   const [ratingMsg, setRatingMsg] = useState('');
 
+  // Currently selected gallery image (thumbnail switcher).
+  // Stored as state (not DOM) so the image swap is reliable.
+  const [activeImg, setActiveImg] = useState(null);
+
   const product = products.find((p) => p.id === id);
+
+  // All images for this product; older products only have "image" (single).
+  const images =
+    product && Array.isArray(product.images) && product.images.length > 0
+      ? product.images.filter((img) => img && img.trim() !== '')
+      : product
+        ? [product.image].filter((img) => img && img.trim() !== '')
+        : [];
+  // Always show the FIRST image unless the user picked a different thumbnail.
+  const mainImg = activeImg && images.includes(activeImg) ? activeImg : images[0];
 
   if (!product) {
     return (
@@ -87,9 +101,27 @@ export default function ProductDetail() {
     <main className="page">
       {toast && <div className="toast">{toast}</div>}
       <div className="detail">
-        <div className="detail-img">
-          <div className="detail-img">{product.images && product.images.length > 0 ? <><img src={product.images[0]} alt={product.name} className="detail-main-img" />{product.images.length > 1 && <div className="detail-thumb-row">{product.images.map((img, idx) => (<button key={idx} className={`detail-thumb ${idx === 0 ? "" : ""}`} onClick={(e) => {e.currentTarget.parentElement.parentElement.querySelector(".detail-main-img").src = img;}}><img src={img} alt={`${product.name} ${idx + 1}`} /></button>))}</div>}</> : <img src={product.image} alt={product.name} className="detail-main-img" />}</div>
+                <div className="detail-img">
+          <img src={mainImg} alt={product.name} className="detail-main-img" loading="lazy" />
+          {images.length > 1 && (
+            <div className="detail-thumb-row" role="group" aria-label="Product images">
+              {images.map((img, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  className={`detail-thumb ${img === mainImg ? 'active' : ''}`}
+                  onClick={() => setActiveImg(img)}
+                  aria-label={`View image ${idx + 1}`}
+                  aria-pressed={img === mainImg}
+                >
+                  <img src={img} alt={`${product.name} — image ${idx + 1}`} loading="lazy" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+
+
         <div className="detail-info">
           <p className="cat-line">{product.category}</p>
           <h1>{product.name}</h1>
