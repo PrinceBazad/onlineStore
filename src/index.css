@@ -533,11 +533,13 @@ p { margin: 0 0 .8em; }
 .status-badge.shipped { background: var(--brand-dark); }
 .status-badge.delivered { background: var(--ok); }
 .status-badge.paid { background: var(--ok); }
+.status-badge.cancelled { background: var(--err); }
 .timeline { display: flex; justify-content: space-between; gap: 8px; margin: 26px 0 30px; position: relative; flex-wrap: wrap; }
 .tl-step { flex: 1; min-width: 120px; text-align: center; opacity: .4; position: relative; }
 .tl-step.done { opacity: 1; }
 .tl-dot { width: 42px; height: 42px; border-radius: 50%; background: var(--line); color: var(--muted); display: grid; place-items: center; margin: 0 auto 8px; font-weight: 700; border: 3px solid #fff; box-shadow: 0 0 0 1px var(--line); }
-.tl-step.done .tl-dot { background: var(--brand); color: #fff; box-shadow: 0 0 0 1px var(--brand); }
+.tl-step.done .tl-dot { background: var(--ok); color: #fff; box-shadow: 0 0 0 1px var(--ok); }
+.tl-step.done strong { color: var(--ok); }
 .tl-step.current .tl-dot { background: var(--gold); color: #fff; box-shadow: 0 0 0 4px rgba(201,162,75,.3); animation: pulse 1.6s infinite; }
 .tl-step strong { display: block; font-size: .92rem; }
 .tl-now { display: inline-block; background: var(--brand-soft); color: var(--brand); font-size: .72rem; padding: 2px 8px; border-radius: 20px; margin-top: 4px; }
