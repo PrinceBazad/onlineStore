@@ -151,7 +151,9 @@ function seedUsers() {
 // ---- Default site settings ---------------------------------
 const DEFAULT_SETTINGS = {
   storeName: 'Baani Suit Collection',
-  logoLetter: 'B',
+     logoUrl: null,
+   logoWidth: 40,
+   logoLetter: 'B',
   tagline: 'Suit Collection',
   announcement: 'Free shipping on orders above ₹1499 · COD available across India',
   heroHeading: 'Designer Suits & Ethnic Elegance',

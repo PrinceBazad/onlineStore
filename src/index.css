@@ -102,12 +102,24 @@ p { margin: 0 0 .8em; }
   display: flex; align-items: center; gap: 20px;
 }
 .brand { display: flex; align-items: center; gap: 10px; }
+.brand-logo { width: 40px; height: auto; object-fit: contain; }
 .brand-mark {
   width: 40px; height: 40px; border-radius: 50%;
   background: radial-gradient(circle at 30% 25%, var(--brand), var(--brand-dark));
   color: #fff; display: grid; place-items: center; font-family: var(--serif);
   font-weight: 700; font-size: 1.4rem;
 }
+/* ── Logo upload (admin settings) ─────────── */
+.logo-upload-row {
+  display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap;
+}
+.logo-url-input { flex: 1; min-width: 160px; }
+.logo-file-btn {
+  background: var(--brand-soft); color: var(--brand); border: 1px solid var(--line);
+  border-radius: 8px; padding: 7px 12px; font-size: .85rem; cursor: pointer; white-space: nowrap;
+}
+.logo-file-btn:hover { background: var(--brand); color: #fff; }
+.logo-file-btn input { display: none; }
 .brand-text { font-family: var(--serif); font-weight: 700; font-size: 1.5rem; color: var(--ink); line-height: 1; }
 .brand-text em { display: block; font-style: normal; font-size: .7rem; letter-spacing: 2px; color: var(--brand); text-transform: uppercase; }
 .nav-links { display: flex; gap: 22px; list-style: none; margin: 0; margin-left: auto; padding: 0; }
@@ -686,6 +698,7 @@ p { margin: 0 0 .8em; }
   .menu-btn { display: grid; }
   .navbar .btn-ghost { display: none; }
   .brand-mark { width: 34px; height: 34px; font-size: 1.15rem; }
+  .brand-logo { width: 34px; }
   .brand-text { font-size: 1.12rem; }
   .brand-text em { font-size: .58rem; letter-spacing: 1.5px; }
   .nav-actions { gap: 10px; }

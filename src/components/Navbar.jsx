@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { useWishlist } from '../context/WishlistContext.jsx';
 import { useData } from '../context/DataContext.jsx';
+import Logo from './Logo.jsx';
 
 const links = [
   { to: '/', label: 'Home' },
@@ -30,8 +31,8 @@ export default function Navbar({ onCartOpen }) {
       </div>
 
       <nav className="nav-inner">
-        <Link to="/" className="brand" onClick={closeMenu}>
-          <span className="brand-mark">{settings.logoLetter}</span>
+                <Link to="/" className="brand" onClick={closeMenu}>
+          <Logo />
           <span className="brand-text">
             {settings.storeName} <em>{settings.tagline}</em>
           </span>

@@ -42,7 +42,36 @@ export default function Admin() {
     return <Navigate to="/login" replace state={{ from: '/admin' }} />;
   }
 
-  const setSField = (k) => (e) => setS({ ...s, [k]: e.target.value });
+    const setSField = (k) => (e) => setS({ ...s, [k]: e.target.value });
+
+  const readAsDataURL = async (file) => {
+    const buf = await file.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let bin = '';
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return 'data:' + file.type + ';base64,' + btoa(bin);
+  };
+
+  const handleLogoFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
+      setSavedMsg('Upload an image file smaller than 5 MB.');
+      setTimeout(() => setSavedMsg(''), 2500);
+      e.target.value = '';
+      return;
+    }
+    try {
+      const url = await readAsDataURL(file);
+      setS({ ...s, logoUrl: url, logoWidth: 48 });
+      setSavedMsg('Logo uploaded — click Save settings to apply site-wide.');
+      setTimeout(() => setSavedMsg(''), 2500);
+    } catch {
+      setSavedMsg('Failed to read the image file.');
+      setTimeout(() => setSavedMsg(''), 2500);
+    }
+    e.target.value = '';
+  };
 
   const saveSettings = (e) => {
     e.preventDefault();
@@ -412,7 +441,7 @@ export default function Admin() {
           <h2>Store settings</h2>
           <p className="muted">These changes are applied across the site instantly.</p>
           <form onSubmit={saveSettings} className="form settings-form">
-            <div className="grid2">
+                        <div className="grid2">
               <label>Store name
                 <input value={s.storeName} onChange={setSField('storeName')} />
               </label>
@@ -420,6 +449,32 @@ export default function Admin() {
                 <input maxLength={1} value={s.logoLetter} onChange={setSField('logoLetter')} />
               </label>
             </div>
+
+            <label>Logo image (optional — overrides the letter mark)
+              <div className="logo-upload-row">
+                <input
+                  type="url"
+                  placeholder="https://example.com/logo.png"
+                  value={s.logoUrl || ''}
+                  onChange={(e) => setS({ ...s, logoUrl: e.target.value || null })}
+                  className="logo-url-input"
+                />
+                <label className="logo-file-btn">
+                  Upload file
+                  <input type="file" accept="image/*" hidden onChange={handleLogoFile} />
+                </label>
+                {s.logoUrl && (
+                  <button
+                    type="button"
+                    className="linklike"
+                    onClick={() => setS({ ...s, logoUrl: null })}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              <span className="muted tiny">Paste an image URL or upload a file. Recommended: a transparent PNG, ~48px tall. Max 5 MB.</span>
+            </label>
             <label>Tagline (below the store name)
               <input value={s.tagline} onChange={setSField('tagline')} />
             </label>
