@@ -12,6 +12,7 @@ export default function Login() {
   const loc = useLocation();
   const [form, setForm] = useState({ email: '', password: '' });
   const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
 
   const from = loc.state?.from || '/';
 
@@ -19,12 +20,16 @@ export default function Login() {
 
   const submit = async (e) => {
     e.preventDefault();
+    if (busy) return;
     setErr('');
+    setBusy(true);
     try {
       await login(form);
       nav(from, { replace: true });
     } catch (ex) {
       setErr(ex.message);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -50,7 +55,16 @@ export default function Login() {
 
           {err && <p className="error">{err}</p>}
 
-          <button className="btn btn-gold btn-block" type="submit">Log in</button>
+          <button className="btn btn-gold btn-block" type="submit" disabled={busy}>
+            {busy ? (
+              <>
+                <span className="btn-spinner" aria-hidden="true"></span>
+                Logging in…
+              </>
+            ) : (
+              'Log in'
+            )}
+          </button>
         </form>
 
         <p className="muted center">
@@ -60,7 +74,7 @@ export default function Login() {
         <div className="demo-row">
           <span>Demo login:</span>
           {DEMO.map((d) => (
-            <button key={d.email} className="chip"
+            <button key={d.email} className="chip" disabled={busy}
               onClick={() => fill(d.email, d.pass)}>
               {d.label}
             </button>

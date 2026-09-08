@@ -628,6 +628,25 @@ p { margin: 0 0 .8em; }
 .dz-tick { display: inline-grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; background: #e8f5ec; color: var(--ok); font-size: 1.6rem; font-weight: bold; margin-bottom: 10px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── Login button loading spinner ───────── */
+.btn .btn-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  flex-shrink: 0;
+}
+.btn.btn-gold.btn-block {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+}
+.btn:disabled { opacity: .75; cursor: not-allowed; }
+
 /* ── Order success ──────────────────────── */
 .order-success { text-align: center; padding: 40px 24px; }
 .os-tick { display: inline-grid; place-items: center; width: 70px; height: 70px; border-radius: 50%; background: #e8f5ec; color: var(--ok); font-size: 2rem; font-weight: bold; margin-bottom: 14px; }
