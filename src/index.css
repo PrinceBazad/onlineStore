@@ -68,6 +68,28 @@ p { margin: 0 0 .8em; }
 .btn:disabled { opacity: .55; cursor: not-allowed; transform: none !important; }
 .btn.danger { background: #fbecec; color: var(--err); border-color: #f0c9c4; }
 .btn.danger:hover { background: var(--err); color: #fff; }
+
+/* ── Page transitions ────────────────────── */
+.page-transition {
+  /* base state — children fade in from this */
+  opacity: 1;
+  transform: translateY(12px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* fading out (route leaving) */
+.page-exit-active {
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+/* fully visible (route entered) */
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
 .linklike { background: none; border: none; color: var(--brand); padding: 0; cursor: pointer; font-size: .88rem; text-decoration: underline; }
 .icon-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--ink); }
 
