@@ -36,7 +36,7 @@ const emptyForm = {
 
 export default function Admin() {
   const { isAdmin } = useAuth();
-  const { products, orders, settings, updateSettings, addProduct, updateProduct, deleteProduct, updateOrderStatus } = useData();
+  const { products, orders, settings, updateSettings, addProduct, updateProduct, deleteProduct, updateOrderStatus, messages, updateMessageStatus } = useData();
   const [tab, setTab] = useState('products');
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
@@ -184,6 +184,9 @@ export default function Admin() {
         </button>
         <button className={tab === 'orders' ? 'chip active' : 'chip'} onClick={() => setTab('orders')}>
           Orders ({orders.length})
+        </button>
+        <button className={tab === 'messages' ? 'chip active' : 'chip'} onClick={() => setTab('messages')}>
+          Messages ({messages.filter((m) => m.status === 'pending').length})
         </button>
         <button className={tab === 'settings' ? 'chip active' : 'chip'} onClick={() => setTab('settings')}>
           Settings
@@ -392,7 +395,72 @@ export default function Admin() {
                       ) : (
                         <span className="muted">Completed</span>
                       )}
+                      {o.status !== 'cancelled' && o.status !== 'delivered' && (
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={() => {
+                            if (window.confirm(`Cancel order ${o.id}? This cannot be undone.`)) {
+                              updateOrderStatus(o.id, 'cancelled', 'Cancelled');
+                            }
+                          }}
+                        >
+                          Cancel order
+                        </button>
+                      )}
+                      {o.status === 'cancelled' && <span className="muted">Cancelled</span>}
                     </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+      {tab === 'messages' && (
+        <section className="card-box">
+          <h2>Customer messages</h2>
+          <p className="muted">Messages sent by users through the Contact page.</p>
+          {messages.length === 0 ? (
+            <p className="muted">No messages yet.</p>
+          ) : (
+            <div className="msg-list">
+              {messages.map((m) => (
+                <div key={m.id} className={`msg-card msg-${m.status || 'pending'}`}>
+                  <div className="msg-head">
+                    <div>
+                      <strong>{m.name}</strong>
+                      <span className="muted"> · {m.email}</span>
+                    </div>
+                    <div className="msg-head-right">
+                      <span className={`badge badge-${m.status || 'pending'}`}>
+                        {(m.status || 'pending').charAt(0).toUpperCase() + (m.status || 'pending').slice(1)}
+                      </span>
+                      <span className="muted tiny">{m.date ? new Date(m.date).toLocaleString() : ''}</span>
+                    </div>
+                  </div>
+                  <p className="msg-body">{m.message}</p>
+                  <div className="msg-actions">
+                    <button
+                      className={`btn btn-sm ${m.status === 'pending' ? 'btn-gold' : ''}`}
+                      onClick={() => updateMessageStatus(m.id, 'pending')}
+                      disabled={m.status === 'pending'}
+                    >
+                      Pending
+                    </button>
+                    <button
+                      className={`btn btn-sm ${m.status === 'readed' ? 'btn-gold' : ''}`}
+                      onClick={() => updateMessageStatus(m.id, 'readed')}
+                      disabled={m.status === 'readed'}
+                    >
+                      Readed
+                    </button>
+                    <button
+                      className={`btn btn-sm ${m.status === 'success' ? 'btn-gold' : ''}`}
+                      onClick={() => updateMessageStatus(m.id, 'success')}
+                      disabled={m.status === 'success'}
+                    >
+                      Success
+                    </button>
                   </div>
                 </div>
               ))}

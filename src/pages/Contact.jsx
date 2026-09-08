@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { useData } from '../context/DataContext.jsx';
 
 export default function Contact() {
-  const { settings } = useData();
+  const { settings, addMessage } = useData();
   const [sent, setSent] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', message: '' });
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
   const submit = (e) => {
     e.preventDefault();
+    addMessage({ name: form.name, email: form.email, message: form.message });
     setSent(true);
   };
 

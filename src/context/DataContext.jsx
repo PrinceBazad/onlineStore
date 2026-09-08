@@ -9,6 +9,7 @@ export function DataProvider({ children }) {
   const [orders, setOrders] = useState(db.getOrders());
   const [settings, setSettings] = useState(db.getSettings());
   const [reviews, setReviews] = useState(db.getReviews());
+  const [messages, setMessages] = useState(db.getMessages());
 
   const updateSettings = (patch) => {
     const next = { ...settings, ...patch };
@@ -23,6 +24,8 @@ export function DataProvider({ children }) {
       if (e.key === 'baani_settings') setSettings(db.getSettings());
       else if (e.key === 'baani_products') setProducts(db.getProducts());
       else if (e.key === 'baani_orders') setOrders(db.getOrders());
+      else if (e.key === 'baani_reviews') setReviews(db.getReviews());
+      else if (e.key === 'baani_messages') setMessages(db.getMessages());
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
@@ -34,12 +37,14 @@ export function DataProvider({ children }) {
     const unsubOrders = listenFromFirestore('baani_orders', setOrders);
     const unsubSettings = listenFromFirestore('baani_settings', setSettings);
     const unsubReviews = listenFromFirestore('baani_reviews', setReviews);
+    const unsubMessages = listenFromFirestore('baani_messages', setMessages);
 
     return () => {
       unsubProducts();
       unsubOrders();
       unsubSettings();
       unsubReviews();
+      unsubMessages();
     };
   }, []);
 
@@ -68,15 +73,38 @@ export function DataProvider({ children }) {
   };
 
   const reviewsFor = (productId) =>
-    reviews.filter((r) => r.productId === productId);
+    products.find((p) => p.id === productId)
+      ? reviews.filter((r) => r.productId === productId)
+      : [];
 
-  const ratingFor = (productId) => {
-    const rs = reviewsFor(productId);
-    if (!rs.length) return { avg: 0, count: 0 };
+  const ratingFor = () => {
+    if (!reviews.length) return { avg: 0, count: 0 };
     return {
-      avg: rs.reduce((s, x) => s + x.rating, 0) / rs.length,
-      count: rs.length,
+      avg: reviews.reduce((s, x) => s + x.rating, 0) / reviews.length,
+      count: reviews.length,
     };
+  };
+
+  // ----- message helpers -----
+  const addMessage = ({ name, email, message }) => {
+    const msg = {
+      id: db.uid('MSG-'),
+      name,
+      email,
+      message,
+      status: 'pending',
+      date: new Date().toISOString(),
+    };
+    const next = [msg, ...messages];
+    setMessages(next);
+    db.saveMessages(next);
+    return msg;
+  };
+
+  const updateMessageStatus = (id, status) => {
+    const next = messages.map((m) => (m.id === id ? { ...m, status } : m));
+    setMessages(next);
+    db.saveMessages(next);
   };
 
   // ----- product admin helpers -----
@@ -169,8 +197,11 @@ export function DataProvider({ children }) {
       placeOrder,
       updateOrderStatus,
       findOrder,
+      messages,
+      addMessage,
+      updateMessageStatus,
     }),
-    [products, orders, settings, reviews]
+    [products, orders, settings, reviews, messages]
   );
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

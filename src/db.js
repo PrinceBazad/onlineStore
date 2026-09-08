@@ -15,6 +15,7 @@ const KEYS = {
   settings: 'baani_settings',
   wishlist: 'baani_wishlist',
   reviews: 'baani_reviews',
+  messages: 'baani_messages',
 };
 
 // Initialize Firebase (non-blocking)
@@ -253,6 +254,15 @@ export const db = {
   saveReviews(r) {
     write(KEYS.reviews, r);
     syncToFirestore(KEYS.reviews, r);
+  },
+
+  // messages stored as array of objects
+  getMessages() {
+    return read(KEYS.messages, []);
+  },
+  saveMessages(m) {
+    write(KEYS.messages, m);
+    syncToFirestore(KEYS.messages, m);
   },
 
   uid,
