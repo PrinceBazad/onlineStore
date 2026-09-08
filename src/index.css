@@ -600,7 +600,9 @@ p { margin: 0 0 .8em; }
 .footer a { color: #d9cdc0; }
 .footer a:hover { color: var(--gold); }
 .socials { display: flex; gap: 10px; }
-.socials span { width: 36px; height: 36px; border: 1px solid #4a3b40; border-radius: 50%; display: grid; place-items: center; cursor: pointer; }
+.social-link { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border: 1px solid #4a3b40; border-radius: 999px; color: inherit; text-decoration: none; font-size: .9rem; transition: border-color .2s, background .2s; }
+.social-link:hover { border-color: var(--brand, #9b1c3d); background: rgba(255,255,255,.06); }
+.social-link svg { flex-shrink: 0; }
 .footer-bottom { max-width: 1240px; margin: 0 auto; padding: 16px 22px; border-top: 1px solid #3d2f34; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: .85rem; }
 .footer-bottom p { margin: 0; }
 
