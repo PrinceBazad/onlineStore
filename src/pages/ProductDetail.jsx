@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useData } from '../context/DataContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
@@ -21,9 +21,8 @@ export default function ProductDetail() {
   const [comment, setComment] = useState('');
   const [ratingMsg, setRatingMsg] = useState('');
 
-  // Currently selected gallery image (thumbnail switcher).
-  // Stored as state (not DOM) so the image swap is reliable.
-  const [activeImg, setActiveImg] = useState(null);
+  // Currently selected gallery image index (moves with the arrows).
+  const [activeIndex, setActiveIndex] = useState(0);
 
   const product = products.find((p) => p.id === id);
 
@@ -34,8 +33,23 @@ export default function ProductDetail() {
       : product
         ? [product.image].filter((img) => img && img.trim() !== '')
         : [];
-  // Always show the FIRST image unless the user picked a different thumbnail.
-  const mainImg = activeImg && images.includes(activeImg) ? activeImg : images[0];
+  // Always show the first image by default; the arrows move through the rest.
+  const safeIndex = activeIndex < images.length ? activeIndex : 0;
+  const mainImg = images[safeIndex] || images[0];
+
+  const prevImage = () => {
+    if (images.length < 2) return;
+    setActiveIndex((i) => (i - 1 + images.length) % images.length);
+  };
+  const nextImage = () => {
+    if (images.length < 2) return;
+    setActiveIndex((i) => (i + 1) % images.length);
+  };
+
+  // Reset the gallery to the first image when opening a different product.
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [id]);
 
   if (!product) {
     return (
@@ -101,23 +115,18 @@ export default function ProductDetail() {
     <main className="page">
       {toast && <div className="toast">{toast}</div>}
       <div className="detail">
-                <div className="detail-img">
+                        <div className="detail-img">
           <img src={mainImg} alt={product.name} className="detail-main-img" loading="lazy" />
           {images.length > 1 && (
-            <div className="detail-thumb-row" role="group" aria-label="Product images">
-              {images.map((img, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  className={`detail-thumb ${img === mainImg ? 'active' : ''}`}
-                  onClick={() => setActiveImg(img)}
-                  aria-label={`View image ${idx + 1}`}
-                  aria-pressed={img === mainImg}
-                >
-                  <img src={img} alt={`${product.name} — image ${idx + 1}`} loading="lazy" />
-                </button>
-              ))}
-            </div>
+            <>
+              <button type="button" className="gallery-arrow gallery-prev" onClick={prevImage} aria-label="Previous image">
+                <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+              </button>
+              <button type="button" className="gallery-arrow gallery-next" onClick={nextImage} aria-label="Next image">
+                <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+              </button>
+              <span className="gallery-count">{safeIndex + 1} / {images.length}</span>
+            </>
           )}
         </div>
 
