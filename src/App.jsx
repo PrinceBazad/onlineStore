@@ -8,6 +8,7 @@ import Navbar from './components/Navbar.jsx';
 import Footer from './components/Footer.jsx';
 import CartDrawer from './components/CartDrawer.jsx';
 import ScrollToTop from './components/ScrollToTop.jsx';
+import TitleSync from './components/TitleSync.jsx';
 import Home from './pages/Home.jsx';
 import Catalog from './pages/Catalog.jsx';
 import ProductDetail from './pages/ProductDetail.jsx';
@@ -36,6 +37,7 @@ export default function App() {
         <CartProvider>
           <WishlistProvider>
             <ScrollToTop />
+            <TitleSync />
             <Navbar onCartOpen={() => setCartOpen(true)} />
             <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
             <Routes>
