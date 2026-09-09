@@ -693,7 +693,7 @@ p { margin: 0 0 .8em; }
 }
 @media (max-width: 760px) {
   /* navbar → compact + hamburger */
-  .nav-inner { padding: 10px 16px; gap: 10px; }
+  .nav-inner { padding: 12px 16px; gap: 0; justify-content: space-between; }
   .nav-links { display: none; }
   .menu-btn { display: grid; }
   .navbar .btn-ghost { display: none; }
@@ -701,7 +701,7 @@ p { margin: 0 0 .8em; }
   .brand-logo { width: 34px; }
   .brand-text { font-size: 1.12rem; }
   .brand-text em { font-size: .58rem; letter-spacing: 1.5px; }
-  .nav-actions { gap: 10px; }
+  .nav-actions { gap: 14px; }
   .user-chip { font-size: .78rem; }
 
   .logout-desktop { display: inline-flex; align-items: center; justify-content: center; }
