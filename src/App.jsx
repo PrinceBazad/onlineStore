@@ -20,6 +20,7 @@ import OrderStatus from './pages/OrderStatus.jsx';
 import MyOrders from './pages/MyOrders.jsx';
 import Wishlist from './pages/Wishlist.jsx';
 import Admin from './pages/Admin.jsx';
+import Profile from './pages/Profile.jsx';
 import About from './pages/About.jsx';
 import Contact from './pages/Contact.jsx';
 
@@ -52,7 +53,8 @@ export default function App() {
               <Route path="/track" element={<OrderStatus />} />
               <Route path="/orders" element={<MyOrders />} />
               <Route path="/wishlist" element={<Wishlist />} />
-              <Route path="/admin" element={<Admin />} />
+                            <Route path="/admin" element={<Admin />} />
+              <Route path="/profile" element={<Profile />} />
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="*" element={<Home />} />

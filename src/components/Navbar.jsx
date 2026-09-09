@@ -5,6 +5,7 @@ import { useCart } from '../context/CartContext.jsx';
 import { useWishlist } from '../context/WishlistContext.jsx';
 import { useData } from '../context/DataContext.jsx';
 import Logo from './Logo.jsx';
+import AccountIcon from './AccountIcon.jsx';
 
 const links = [
   { to: '/', label: 'Home' },
@@ -63,12 +64,14 @@ export default function Navbar({ onCartOpen }) {
 
         <div className="nav-actions">
           {user ? (
-                        <div className="user-menu">
-              <span className="user-chip">{user.name.split(' ')[0]}</span>
+            <>
+              <Link to="/profile" className="account-link" onClick={closeMenu} aria-label="My account">
+                <AccountIcon size={22} />
+              </Link>
               <button className="linklike logout-desktop" onClick={() => { logout(); }}>
                 Logout
               </button>
-            </div>
+            </>
           ) : (
             <Link to="/login" className="btn btn-ghost btn-sm">
               Log in

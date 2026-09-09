@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { db } from '../db.js';
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail } from 'firebase/auth';
+import { getFirestore, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { app } from '../firebase.js';
 
 const AuthContext = createContext(null);
@@ -20,11 +20,12 @@ export function AuthProvider({ children }) {
         const userDoc = await getDoc(doc(firestore, 'users', firebaseUser.uid));
         const userData = userDoc.data() || {};
         
-        const session = {
+                const session = {
           id: firebaseUser.uid,
           name: firebaseUser.displayName || userData.name || '',
           email: firebaseUser.email,
           phone: userData.phone || '',
+          address: userData.address || '',
           role: userData.role || 'customer',
         };
         setUser(session);
@@ -55,11 +56,12 @@ export function AuthProvider({ children }) {
       };
       await setDoc(doc(firestore, 'users', firebaseUser.uid), userData);
 
-      const session = {
+            const session = {
         id: firebaseUser.uid,
         name: name || '',
         email: email.toLowerCase(),
         phone: phone || '',
+        address: '',
         role: 'customer',
       };
       db.saveSession(session);
@@ -86,11 +88,12 @@ export function AuthProvider({ children }) {
       const userDoc = await getDoc(doc(firestore, 'users', firebaseUser.uid));
       const userData = userDoc.data() || {};
 
-      const session = {
+            const session = {
         id: firebaseUser.uid,
         name: firebaseUser.displayName || userData.name || '',
         email: firebaseUser.email,
         phone: userData.phone || '',
+        address: userData.address || '',
         role: userData.role || 'customer',
       };
       db.saveSession(session);
@@ -106,7 +109,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const logout = async () => {
+    const logout = async () => {
     try {
       await signOut(auth);
       db.clearSession();
@@ -116,10 +119,99 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // ── Password change helpers ──────────────────────────────
+
+  // 1) Change password by verifying the current password first.
+  const changePasswordWithCurrent = async (currentPassword, newPassword) => {
+    try {
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser || !firebaseUser.email) throw new Error('No authenticated user.');
+
+      const credential = EmailAuthProvider.credential(
+        firebaseUser.email,
+        currentPassword
+      );
+      await reauthenticateWithCredential(firebaseUser, credential);
+      await updatePassword(firebaseUser, newPassword);
+      return { success: true };
+    } catch (error) {
+      if (
+        error.code === 'auth/wrong-password' ||
+        error.code === 'auth/invalid-credential' ||
+        error.code === 'auth/invalid-verification-code'
+      ) {
+        throw new Error('Current password is incorrect.');
+      }
+      throw new Error(error.message || 'Failed to change password.');
+    }
+  };
+
+  // 2) OTP flow: send a 6-digit OTP to the user's email.
+  //    In production the OTP is generated & emailed server-side.
+  //    Here we also trigger Firebase's sendPasswordResetEmail so a real
+  //    email is dispatched, and return the OTP for demo verification.
+  const generateOtp = () =>
+    Math.floor(100000 + Math.random() * 900000).toString();
+
+  const sendOtpToEmail = async (email) => {
+    const otp = generateOtp();
+    // Fire a real password-reset email (if Firebase email provider is enabled)
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (error) {
+      console.warn('sendPasswordResetEmail failed:', error.message);
+    }
+    // In a real app the OTP is delivered via a backend/email service.
+    // We return it so the demo UI can display/verify it.
+    return otp;
+  };
+
+  // Update password without re-verifying current (used after OTP is verified)
+  const changePasswordDirect = async (newPassword) => {
+    try {
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) throw new Error('No authenticated user.');
+      await updatePassword(firebaseUser, newPassword);
+      return { success: true };
+    } catch (error) {
+      throw new Error(error.message || 'Failed to change password.');
+    }
+  };
+
+  // ── Profile update helper ──────────────────────────────
+  const updateUserProfile = async (data) => {
+    try {
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) throw new Error('No authenticated user.');
+
+      await setDoc(doc(firestore, 'users', firebaseUser.uid), data, { merge: true });
+
+      const updated = { ...user, ...data };
+      setUser(updated);
+      db.saveSession(updated);
+      return updated;
+    } catch (error) {
+      throw new Error(error.message || 'Failed to update profile.');
+    }
+  };
+
   const isAdmin = user?.role === 'admin';
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, signup, login, logout, loading }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isAdmin,
+        signup,
+        login,
+        logout,
+        loading,
+        changePasswordWithCurrent,
+        sendOtpToEmail,
+        changePasswordDirect,
+        updateUserProfile,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
