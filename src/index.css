@@ -702,6 +702,8 @@ p { margin: 0 0 .8em; }
   .brand-text { font-size: 1.12rem; }
   .brand-text em { font-size: .58rem; letter-spacing: 1.5px; }
   .nav-actions { gap: 10px; }
+  /* Hide account icon on mobile — shown only in hamburger menu via mobile-logout */
+  .account-link { display: none; }
   .user-chip { font-size: .78rem; }
 
   .logout-desktop { display: inline-flex; align-items: center; justify-content: center; }
