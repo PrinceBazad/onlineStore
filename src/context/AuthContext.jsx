@@ -150,34 +150,8 @@ export function AuthProvider({ children }) {
   //    In production the OTP is generated & emailed server-side.
   //    Here we also trigger Firebase's sendPasswordResetEmail so a real
   //    email is dispatched, and return the OTP for demo verification.
-  const generateOtp = () =>
-    Math.floor(100000 + Math.random() * 900000).toString();
-
-  const sendOtpToEmail = async (email) => {
-    const otp = generateOtp();
-    // Fire a real password-reset email (if Firebase email provider is enabled)
-    try {
-      await sendPasswordResetEmail(auth, email);
-    } catch (error) {
-      console.warn('sendPasswordResetEmail failed:', error.message);
-    }
-    // In a real app the OTP is delivered via a backend/email service.
-    // We return it so the demo UI can display/verify it.
-    return otp;
-  };
 
   // Update password without re-verifying current (used after OTP is verified)
-  const changePasswordDirect = async (newPassword) => {
-    try {
-      const firebaseUser = auth.currentUser;
-      if (!firebaseUser) throw new Error('No authenticated user.');
-      await updatePassword(firebaseUser, newPassword);
-      return { success: true };
-    } catch (error) {
-      throw new Error(error.message || 'Failed to change password.');
-    }
-  };
-
   // ── Profile update helper ──────────────────────────────
   const updateUserProfile = async (data) => {
     try {
@@ -207,8 +181,6 @@ export function AuthProvider({ children }) {
         logout,
         loading,
         changePasswordWithCurrent,
-        sendOtpToEmail,
-        changePasswordDirect,
         updateUserProfile,
       }}
     >
