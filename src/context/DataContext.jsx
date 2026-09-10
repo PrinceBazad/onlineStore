@@ -133,6 +133,36 @@ export function DataProvider({ children }) {
   };
 
   // ----- order helpers -----
+  const placeOrder = (payload) => {
+    const order = {
+      id: db.uid('ORD-'),
+      orderDate: new Date().toISOString(),
+      userId: payload.userId || null,
+      customerEmail:
+        payload.customer?.email ||
+        (payload.userEmail ? payload.userEmail : null),
+      items: payload.items,
+      customer: payload.customer,
+      shipping: payload.shipping,
+      payment: payload.payment,
+      subtotal: payload.subtotal,
+      shippingFee: payload.shippingFee,
+      total: payload.total,
+      status: payload.payment.method === 'cod' ? 'confirmed' : 'paid',
+      statusHistory: [
+        {
+          status: 'placed',
+          label: 'Order Placed',
+          at: new Date().toISOString(),
+        },
+      ],
+    };
+    const next = [order, ...orders];
+    setOrders(next);
+    db.saveOrders(next);
+    return order;
+  };
+
   const CANCEL_WINDOW_MS = 2 * 60 * 60 * 1000; // 2 hours
 
   const canCancel = (order) => {
