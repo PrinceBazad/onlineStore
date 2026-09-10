@@ -54,12 +54,12 @@ export default function OrderStatus() {
 
   useEffect(() => {
     if (!remaining) return;
-    if (countdownRef.current) countdownRef.current.cancel();
+    if (countdownRef.current) clearInterval(countdownRef.current);
     const timer = setInterval(() => {
       const r = cancelTimeRemaining(order);
       if (!r) {
         setCancelDisabled(true);
-        countdownRef.current && countdownRef.current.cancel();
+        if (countdownRef.current) clearInterval(countdownRef.current);
         return;
       }
       setCancelDisabled(false);
