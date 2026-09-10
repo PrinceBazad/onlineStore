@@ -6,7 +6,7 @@ import { formatINR, formatDateTime } from '../utils/format.js';
 
 export default function MyOrders() {
   const { user } = useAuth();
-  const { orders } = useData();
+  const { orders, canCancel } = useData();
 
   if (!user) {
     return <Navigate to="/login" replace state={{ from: '/orders' }} />;
@@ -33,31 +33,39 @@ export default function MyOrders() {
         </div>
       ) : (
         <div className="orders-list">
-          {mine.map((o) => (
-            <div className="order-row" key={o.id}>
-              <div className="ord-head">
-                <strong>Order {o.id}</strong>
-                <span className="muted">{formatDateTime(o.orderDate)}</span>
-                <span className={`status-badge ${o.status}`}>{o.status.toUpperCase()}</span>
-                <span className="ord-total">{formatINR(o.total)} · {o.payment.mode}</span>
-              </div>
-              <div className="ord-body">
-                <div>
-                  <ul className="sum-items">
-                    {o.items.map((it) => (
-                      <li key={it.id}><span>{it.name} × {it.qty}</span><span>{formatINR(it.price * it.qty)}</span></li>
-                    ))}
-                  </ul>
-                  <p className="muted">
-                    Shipped to {o.shipping?.address}, {o.shipping?.city} — {o.shipping?.pincode}
-                  </p>
+          {mine.map((o) => {
+            const eligible = o && canCancel(o);
+            return (
+              <div className="order-row" key={o.id}>
+                <div className="ord-head">
+                  <strong>Order {o.id}</strong>
+                  <span className="muted">{formatDateTime(o.orderDate)}</span>
+                  <span className={`status-badge ${o.status}`}>{o.status.toUpperCase()}</span>
+                  <span className="ord-total">{formatINR(o.total)} · {o.payment.mode}</span>
                 </div>
-                <div className="ord-actions">
-                  <Link to={`/track?order=${o.id}`} className="btn btn-sm">Track order</Link>
+                <div className="ord-body">
+                  <div>
+                    <ul className="sum-items">
+                      {o.items.map((it) => (
+                        <li key={it.id}><span>{it.name} × {it.qty}</span><span>{formatINR(it.price * it.qty)}</span></li>
+                      ))}
+                    </ul>
+                    <p className="muted">
+                      Shipped to {o.shipping?.address}, {o.shipping?.city} — {o.shipping?.pincode}
+                    </p>
+                  </div>
+                  <div className="ord-actions">
+                    <Link to={`/track?order=${o.id}`} className="btn btn-sm">Track order</Link>
+                    {eligible ? (
+                      <Link to={`/track?order=${o.id}`} className="btn btn-sm btn-ghost">Cancel within 2h</Link>
+                    ) : o.status === 'cancelled' ? null : (
+                      <span className="muted tiny">Cancel window closed</span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </main>

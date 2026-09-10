@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, Navigate } from 'react-router-dom';
 import { useData } from '../context/DataContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -6,11 +6,13 @@ import { formatINR, formatDateTime } from '../utils/format.js';
 
 export default function OrderStatus() {
   const { user } = useAuth();
-  const { findOrder } = useData();
+  const { findOrder, canCancel, cancelTimeRemaining, cancelOrder } = useData();
   const [params] = useSearchParams();
   const [query, setQuery] = useState('');
   const [order, setOrder] = useState(null);
   const [notFound, setNotFound] = useState(false);
+  const [cancelDisabled, setCancelDisabled] = useState(true);
+  const countdownRef = useRef(null);
 
   // NOTE: all hooks MUST be called on every render — React forbids
   // returning early before a hook (error #300). The auth redirect below
@@ -46,6 +48,37 @@ export default function OrderStatus() {
   const currentIndex = order
     ? timeline.findIndex((t) => t.status === order.status)
     : -1;
+
+  const eligible = order && canCancel(order);
+  const remaining = eligible ? cancelTimeRemaining(order) : null;
+
+  useEffect(() => {
+    if (!remaining) return;
+    if (countdownRef.current) countdownRef.current.cancel();
+    const timer = setInterval(() => {
+      const r = cancelTimeRemaining(order);
+      if (!r) {
+        setCancelDisabled(true);
+        countdownRef.current && countdownRef.current.cancel();
+        return;
+      }
+      setCancelDisabled(false);
+    }, 250);
+    countdownRef.current = timer;
+    return () => clearInterval(timer);
+  }, [order && order.id, remaining]);
+
+  const onCancel = (e) => {
+    e.preventDefault();
+    if (!eligible || cancelDisabled) return;
+    cancelOrder(order.id);
+  };
+
+  const ownsOrder =
+    order &&
+    (order.userId === user.id ||
+      (order.customerEmail &&
+        order.customerEmail.toLowerCase() === user.email.toLowerCase()));
 
   return (
     <main className="page track">
@@ -116,6 +149,51 @@ export default function OrderStatus() {
               <p className="muted">{order.customer?.phone}</p>
             </div>
           </div>
+
+          {order.status === 'cancelled' ? (
+            <div className="cancel-box cant">
+              <h3>Order Cancelled</h3>
+              <p className="cancel-explain">This order was cancelled on {formatDateTime(order.statusHistory[order.statusHistory.length - 1]?.at)}.</p>
+            </div>
+          ) : ownsOrder && eligible ? (
+            <div className={`cancel-box${cancelDisabled ? ' cant' : ''}`}>
+              <h3>Cancel this order</h3>
+              {cancelDisabled && remaining ? (
+                <p className="cancel-explain">This order can be cancelled within 2 hours of placing it. Time has expired.</p>
+              ) : remaining ? (
+                <>
+                  <div className="cancel-row">
+                    <div>
+                      <p className="muted tiny">Time remaining to cancel</p>
+                      <p className="cancel-count">
+                        {String(remaining.mins).padStart(2, '0')}:{' '}
+                        {String(remaining.secs).padStart(2, '0')}
+                      </p>
+                    </div>
+                    <button
+                      className="btn btn-block cancel-btn"
+                      onClick={onCancel}
+                      disabled={cancelDisabled}
+                    >
+                      Cancel order · {formatINR(order.total)}
+                    </button>
+                  </div>
+                  <p className="cancel-explain">
+                    You can cancel this order within 2 hours of placing it. After that, cancellation is not available.
+                  </p>
+                </>
+              ) : (
+                <p className="cancel-explain">This order can be cancelled within 2 hours of placing it. Time has expired.</p>
+              )}
+            </div>
+          ) : ownsOrder && !eligible ? (
+            <div className="cancel-box cant">
+              <h3>Cancellation window closed</h3>
+              <p className="cancel-explain">
+                This order was placed more than 2 hours ago and can no longer be cancelled.
+              </p>
+            </div>
+          ) : null}
         </div>
       )}
     </main>

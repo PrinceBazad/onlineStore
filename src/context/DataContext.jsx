@@ -133,34 +133,45 @@ export function DataProvider({ children }) {
   };
 
   // ----- order helpers -----
-  const placeOrder = (payload) => {
-    const order = {
-      id: db.uid('ORD-'),
-      orderDate: new Date().toISOString(),
-      userId: payload.userId || null,
-      customerEmail:
-        payload.customer?.email ||
-        (payload.userEmail ? payload.userEmail : null),
-      items: payload.items,
-      customer: payload.customer,
-      shipping: payload.shipping,
-      payment: payload.payment, // method + status
-      subtotal: payload.subtotal,
-      shippingFee: payload.shippingFee,
-      total: payload.total,
-      status: payload.payment.method === 'cod' ? 'confirmed' : 'paid',
-      statusHistory: [
-        {
-          status: 'placed',
-          label: 'Order Placed',
-          at: new Date().toISOString(),
-        },
-      ],
-    };
-    const next = [order, ...orders];
+  const CANCEL_WINDOW_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+  const canCancel = (order) => {
+    if (!order) return false;
+    if (order.status === 'cancelled' || order.status === 'shipped' || order.status === 'delivered') {
+      return false;
+    }
+    const orderTime = new Date(order.orderDate).getTime();
+    const elapsed = Date.now() - orderTime;
+    return elapsed < CANCEL_WINDOW_MS;
+  };
+
+  const cancelTimeRemaining = (order) => {
+    if (!canCancel(order)) return null;
+    const orderTime = new Date(order.orderDate).getTime();
+    const elapsed = Date.now() - orderTime;
+    const remaining = CANCEL_WINDOW_MS - elapsed;
+    if (remaining <= 0) return null;
+    const mins = Math.floor(remaining / 60000);
+    const secs = Math.floor((remaining % 60000) / 1000);
+    return { mins, secs, total: remaining };
+  };
+
+  const cancelOrder = (orderId) => {
+    const next = orders.map((o) =>
+      o.id === orderId
+        ? {
+            ...o,
+            status: 'cancelled',
+            statusHistory: [
+              ...o.statusHistory,
+              { status: 'cancelled', label: 'Cancelled by customer', at: new Date().toISOString() },
+            ],
+          }
+        : o
+    );
     setOrders(next);
     db.saveOrders(next);
-    return order;
+    return next.find((o) => o.id === orderId);
   };
 
   const updateOrderStatus = (id, status, label) => {
@@ -198,6 +209,9 @@ export function DataProvider({ children }) {
       placeOrder,
       updateOrderStatus,
       findOrder,
+      canCancel,
+      cancelTimeRemaining,
+      cancelOrder,
       messages,
       addMessage,
       updateMessageStatus,
