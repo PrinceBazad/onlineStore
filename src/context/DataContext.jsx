@@ -187,21 +187,9 @@ export function DataProvider({ children }) {
   };
 
   const cancelOrder = (orderId) => {
-    const next = orders.map((o) =>
-      o.id === orderId
-        ? {
-            ...o,
-            status: 'cancelled',
-            statusHistory: [
-              ...o.statusHistory,
-              { status: 'cancelled', label: 'Cancelled by customer', at: new Date().toISOString() },
-            ],
-          }
-        : o
-    );
+    const next = orders.filter((o) => o.id !== orderId);
     setOrders(next);
     db.saveOrders(next);
-    return next.find((o) => o.id === orderId);
   };
 
   const updateOrderStatus = (id, status, label) => {

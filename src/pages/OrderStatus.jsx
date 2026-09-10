@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams, Navigate } from 'react-router-dom';
+import { useSearchParams, Navigate, useNavigate } from 'react-router-dom';
 import { useData } from '../context/DataContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { formatINR, formatDateTime } from '../utils/format.js';
@@ -7,12 +7,13 @@ import { formatINR, formatDateTime } from '../utils/format.js';
 export default function OrderStatus() {
   const { user } = useAuth();
   const { findOrder, canCancel, cancelTimeRemaining, cancelOrder } = useData();
+  const navigate = useNavigate();
   const [params] = useSearchParams();
   const [query, setQuery] = useState('');
   const [order, setOrder] = useState(null);
   const [notFound, setNotFound] = useState(false);
-  const [cancelDisabled, setCancelDisabled] = useState(true);
-  const countdownRef = useRef(null);
+  const [remaining, setRemaining] = useState(null);
+  const timerRef = useRef(null);
 
   // NOTE: all hooks MUST be called on every render — React forbids
   // returning early before a hook (error #300). The auth redirect below
@@ -50,28 +51,29 @@ export default function OrderStatus() {
     : -1;
 
   const eligible = order && canCancel(order);
-  const remaining = eligible ? cancelTimeRemaining(order) : null;
 
   useEffect(() => {
-    if (!remaining) return;
-    if (countdownRef.current) clearInterval(countdownRef.current);
-    const timer = setInterval(() => {
-      const r = cancelTimeRemaining(order);
-      if (!r) {
-        setCancelDisabled(true);
-        if (countdownRef.current) clearInterval(countdownRef.current);
-        return;
-      }
-      setCancelDisabled(false);
-    }, 250);
-    countdownRef.current = timer;
-    return () => clearInterval(timer);
-  }, [order && order.id, remaining]);
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = null;
+    if (!eligible) {
+      setRemaining(null);
+      return;
+    }
+    // Recompute remaining time every second so the displayed MM:SS
+    // actually decrements on screen.
+    const tick = () => {
+      setRemaining(cancelTimeRemaining(order));
+    };
+    tick();
+    timerRef.current = setInterval(tick, 1000);
+    return () => clearInterval(timerRef.current);
+  }, [order && order.id, eligible]);
 
   const onCancel = (e) => {
     e.preventDefault();
-    if (!eligible || cancelDisabled) return;
+    if (!eligible) return;
     cancelOrder(order.id);
+    navigate('/orders');
   };
 
   const ownsOrder =
@@ -150,17 +152,10 @@ export default function OrderStatus() {
             </div>
           </div>
 
-          {order.status === 'cancelled' ? (
-            <div className="cancel-box cant">
-              <h3>Order Cancelled</h3>
-              <p className="cancel-explain">This order was cancelled on {formatDateTime(order.statusHistory[order.statusHistory.length - 1]?.at)}.</p>
-            </div>
-          ) : ownsOrder && eligible ? (
-            <div className={`cancel-box${cancelDisabled ? ' cant' : ''}`}>
+          {eligible ? (
+            <div className="cancel-box">
               <h3>Cancel this order</h3>
-              {cancelDisabled && remaining ? (
-                <p className="cancel-explain">This order can be cancelled within 1 hour of placing it. Time has expired.</p>
-              ) : remaining ? (
+              {remaining ? (
                 <>
                   <div className="cancel-row">
                     <div>
@@ -173,7 +168,6 @@ export default function OrderStatus() {
                     <button
                       className="btn btn-block cancel-btn"
                       onClick={onCancel}
-                      disabled={cancelDisabled}
                     >
                       Cancel order · {formatINR(order.total)}
                     </button>
@@ -186,7 +180,7 @@ export default function OrderStatus() {
                 <p className="cancel-explain">This order can be cancelled within 1 hour of placing it. Time has expired.</p>
               )}
             </div>
-          ) : ownsOrder && !eligible ? (
+          ) : ownsOrder ? (
             <div className="cancel-box cant">
               <h3>Cancellation window closed</h3>
               <p className="cancel-explain">
