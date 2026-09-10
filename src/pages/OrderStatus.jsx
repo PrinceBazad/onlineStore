@@ -159,7 +159,7 @@ export default function OrderStatus() {
             <div className={`cancel-box${cancelDisabled ? ' cant' : ''}`}>
               <h3>Cancel this order</h3>
               {cancelDisabled && remaining ? (
-                <p className="cancel-explain">This order can be cancelled within 2 hours of placing it. Time has expired.</p>
+                <p className="cancel-explain">This order can be cancelled within 1 hour of placing it. Time has expired.</p>
               ) : remaining ? (
                 <>
                   <div className="cancel-row">
@@ -179,18 +179,18 @@ export default function OrderStatus() {
                     </button>
                   </div>
                   <p className="cancel-explain">
-                    You can cancel this order within 2 hours of placing it. After that, cancellation is not available.
+                    You can cancel this order within 1 hour of placing it. After that, cancellation is not available.
                   </p>
                 </>
               ) : (
-                <p className="cancel-explain">This order can be cancelled within 2 hours of placing it. Time has expired.</p>
+                <p className="cancel-explain">This order can be cancelled within 1 hour of placing it. Time has expired.</p>
               )}
             </div>
           ) : ownsOrder && !eligible ? (
             <div className="cancel-box cant">
               <h3>Cancellation window closed</h3>
               <p className="cancel-explain">
-                This order was placed more than 2 hours ago and can no longer be cancelled.
+                This order was placed more than 1 hour ago and can no longer be cancelled.
               </p>
             </div>
           ) : null}

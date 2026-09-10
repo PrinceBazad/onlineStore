@@ -163,7 +163,7 @@ export function DataProvider({ children }) {
     return order;
   };
 
-  const CANCEL_WINDOW_MS = 2 * 60 * 60 * 1000; // 2 hours
+  const CANCEL_WINDOW_MS = 1 * 60 * 60 * 1000; // 1 hour
 
   const canCancel = (order) => {
     if (!order) return false;
