@@ -77,11 +77,12 @@ export function DataProvider({ children }) {
       ? reviews.filter((r) => r.productId === productId)
       : [];
 
-  const ratingFor = () => {
-    if (!reviews.length) return { avg: 0, count: 0 };
+  const ratingFor = (productId) => {
+    const list = reviewsFor(productId);
+    if (!list.length) return { avg: 0, count: 0 };
     return {
-      avg: reviews.reduce((s, x) => s + x.rating, 0) / reviews.length,
-      count: reviews.length,
+      avg: list.reduce((s, x) => s + x.rating, 0) / list.length,
+      count: list.length,
     };
   };
 
