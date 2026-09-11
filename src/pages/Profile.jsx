@@ -15,7 +15,7 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
 
-  // Name + mobile can only be changed when the user has NO processing order.
+  // Name + mobile + address can only be changed when the user has NO processing order.
   // Processing = any of my orders whose status is not delivered/cancelled.
   const profileLocked = hasProcessingOrdersForUser ? hasProcessingOrdersForUser(user) : false;
 
@@ -35,20 +35,13 @@ export default function Profile() {
   const saveProfile = async (e) => {
     e.preventDefault();
     // Email is never sent — it cannot be changed in any case.
-    // When an order is processing, name + phone are frozen; only address saves.
+    // When an order is processing, name + phone + address are all frozen.
     if (profileLocked) {
-      setSaving(true);
-      try {
-        await updateUserProfile({ address: address.trim() });
-        // Revert any typed name/phone back to the saved values.
-        setName(user?.name || '');
-        setPhone(user?.phone || '');
-        flash('Address updated. Name and mobile are locked while an order is processing.');
-      } catch (ex) {
-        flash(ex.message);
-      } finally {
-        setSaving(false);
-      }
+      // Revert any typed values back to the saved ones; nothing is saved.
+      setName(user?.name || '');
+      setPhone(user?.phone || '');
+      setAddress(user?.address || '');
+      flash('Profile is locked while you have an order in process. You can edit it again once all orders are delivered or cancelled.');
       return;
     }
     setSaving(true);
@@ -96,7 +89,7 @@ export default function Profile() {
             <input value={user?.email || ''} disabled readOnly placeholder='Email' title='Email cannot be changed' />
           </label>
           {profileLocked && (
-            <p className='muted'>Name and mobile number are locked while you have an order in process. You can change them again once all orders are delivered or cancelled.</p>
+            <p className='muted'>Name, mobile number and address are locked while you have an order in process. You can change them again once all orders are delivered or cancelled.</p>
           )}
           <label>Name *
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder='Your name' required disabled={profileLocked} title={profileLocked ? 'Locked while an order is processing' : undefined} />
@@ -105,11 +98,11 @@ export default function Profile() {
             <input type='tel' value={phone} onChange={(e) => setPhone(e.target.value)} placeholder='+1 555 000 0000' disabled={profileLocked} title={profileLocked ? 'Locked while an order is processing' : undefined} />
           </label>
           <label>Address
-            <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={3} placeholder='Street, city, postcode...' />
+            <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={3} placeholder='Street, city, postcode...' disabled={profileLocked} title={profileLocked ? 'Locked while an order is processing' : undefined} />
           </label>
           {msg && <p className='ok'>{msg}</p>}
           <div className='flex-row-m'>
-            <button type='submit' className='btn btn-gold'>Save changes</button>
+            <button type='submit' className='btn btn-gold' disabled={profileLocked} title={profileLocked ? 'Locked while an order is processing' : undefined}>Save changes</button>
           </div>
         </form>
 
