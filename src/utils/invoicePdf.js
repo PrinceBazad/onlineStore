@@ -1,101 +1,245 @@
+import jsPDF from "jspdf";
+import * as qrcode from "qrcode";
+
+const MONEY = (n) => "₹" + Number(n || 0).toLocaleString("en-IN");
+const fmtDt = (d) => {
+  if (!d) return "";
+  const x = new Date(d);
+  return x.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) + " · " +
+    x.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+};
+
+// Each item row ready for the PDF table
 export function invoiceLines(order, settings) {
-  const L = [];
-  const storeName = settings?.storeName || 'Houselaxmicloth Suit Collection';
-  L.push({ t: storeName, s: 17, b: true, gap: 22 });
-  if (settings?.tagline) L.push({ t: settings.tagline, s: 10, gap: 14 });
-  L.push({ t: [settings?.contactPhone, settings?.contactEmail].filter(Boolean).join('  |  '), s: 9, gap: 12 });
-  if (settings?.contactAddress) L.push({ t: settings.contactAddress, s: 9, gap: 18 });
-  L.push({ t: `Invoice  ${order.id}`, s: 13, b: true, gap: 18 });
-  L.push({ t: `Placed: ${fmtDt(order.orderDate)}      Status: ${String(order.status || '').toUpperCase()}`, s: 9.5, gap: 12 });
-  L.push({ t: `Customer: ${order.customer?.name || '-'}   ${order.customer?.phone || ''}`, s: 9.5, gap: 12 });
-  L.push({ t: `Email: ${order.customerEmail || order.customer?.email || '-'}`, s: 9.5, gap: 12 });
-  L.push({ t: `Ship to: ${[order.shipping?.address, order.shipping?.city, order.shipping?.state, order.shipping?.pincode].filter(Boolean).join(', ')}`, s: 9.5, gap: 12 });
-  L.push({ t: `Payment: ${order.payment?.mode || '-'}${order.payment ? ` (${order.payment.status || ''})` : ''}`, s: 9.5, gap: 18 });
-  L.push({ t: 'Items', s: 11, b: true, gap: 16 });
-  (order.items || []).forEach((it, i) => {
-    L.push({ t: `${i + 1}. ${it.name}  x ${it.qty}   -   Rs.${Number(it.price * it.qty || 0).toLocaleString('en-IN')}`, s: 9.5, gap: 14 });
-  });
-  L.push({ t: `Subtotal: Rs.${Number(order.subtotal ?? order.total ?? 0).toLocaleString('en-IN')}`, s: 9.5, gap: 13 });
-  L.push({ t: `Shipping: Rs.${Number(order.shippingFee ?? 0).toLocaleString('en-IN')}`, s: 9.5, gap: 13 });
-  L.push({ t: `Total: Rs.${Number(order.total || 0).toLocaleString('en-IN')}`, s: 12, b: true, gap: 20 });
-  L.push({ t: 'Thank you for shopping with us!', s: 9.5, gap: 12 });
-  return L;
+  const s = settings || {};
+  const items = (order?.items || []).map((it) => ({
+    name: it.name,
+    qty: it.qty || 1,
+    price: Number(it.price || 0),
+    total: Number(it.price || 0) * (it.qty || 1),
+  }));
+  const subtotal = items.reduce((a, b) => a + b.total, 0);
+  const shipping = Number(order?.shippingFee ?? 0);
+  const total = Number(order?.total ?? subtotal + shipping);
+  return {
+    brand: s.storeName || "Houselaxmicloth",
+    tagline: s.tagline || "Ethnic fashion store",
+    phone: s.contactPhone || "",
+    email: s.contactEmail || "",
+    address: s.contactAddress || "",
+    invoiceNo: order?.id || "ORD-",
+    date: fmtDt(order?.orderDate),
+    status: (order?.status || "placed").toUpperCase(),
+    payment: order?.payment?.mode?.toUpperCase() || "—",
+    customer: order?.customer || {},
+    shippingAddr: order?.shipping || {},
+    items,
+    subtotal,
+    shipping,
+    total,
+  };
 }
+const wraps = (doc, text, maxW, size) => {
+  doc.setFontSize(size);
+  const out = doc.splitTextToSize(text || "", maxW);
+  return out.length ? out : [""];
+};
 
-function esc(s) {
-  return String(s ?? '').replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
-}
+async function buildInvoicePdf(order, settings) {
+  const L = invoiceLines(order, settings);
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const W = doc.internalPageSize.getWidth();            // 210
+  const H = doc.internalPageSize.getHeight();           // 297
+  const M = 14;                                         // margin
+  const CW = W - M * 2;                                 // content width
+  let y = 0;
 
-function buildPdfBytes(order, settings) {
-  const lines = invoiceLines(order, settings);
-  const W = 595, H = 842, ML = 56, TOP = 70, BOT = 60;
-  const pages = [[]];
-  let y = H - TOP;
-  lines.forEach((ln) => {
-    if (y - ln.gap < BOT) { pages.push([]); y = H - TOP; }
-    const size = ln.s;
-    const style = ln.b ? '/F2' : '/F1';
-    y -= ln.gap * 0.72 + size * 0.5;
-    pages[pages.length - 1].push(`BT ${style} ${size} Tf ${ML} ${y.toFixed(1)} Td (${esc(ln.t)}) Tj ET`);
-    y -= size * 0.7;
-  });
-  const objs = [];
-  objs.push('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
-  objs.push(`2 0 obj\n<< /Type /Pages /Kids [${pages.map((_, i) => `${4 + i} 0 R`).join(' ')}] /Count ${pages.length} >>\nendobj\n`);
-  objs.push('3 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n');
-  objs.push('7 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n');
-  const pageIds = pages.map((_, i) => 4 + i);
-  pages.forEach((ops, i) => {
-    const stream = ops.join('\n') + '\n';
-    const len = new TextEncoder().encode(stream).length;
-    objs.push(`${pageIds[i]} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 3 0 R /F2 7 0 R >> >> /Contents ${10 + i} 0 R >>\nendobj\n`);
-  });
-  pages.forEach((ops, i) => {
-    const stream = ops.join('\n') + '\n';
-    const len = new TextEncoder().encode(stream).length;
-    objs.push(`${10 + i} 0 obj\n<< /Length ${len} >>\nstream\n${stream}endstream\nendobj\n`);
-  });
-  const maxId = 10 + pages.length - 1;
-  const byId = {};
-  objs.forEach((o) => { byId[parseInt(o.split(' ')[0], 10)] = o; });
-  let out = '%PDF-1.4\n';
-  const offsets = {};
-  for (let id = 1; id <= maxId; id++) {
-    if (!byId[id]) continue;
-    offsets[id] = new TextEncoder().encode(out).length;
-    out += byId[id];
+  const brandR = 155, brandG = 28, brandB = 61;
+  const inkR = 43, inkG = 34, inkB = 38;
+
+  // ---------- Header band ----------
+  doc.setFillColor(250, 240, 243);
+  doc.rect(0, 0, W, 30, "F");
+  doc.setDrawColor(brandR, brandG, brandB);
+  doc.setLineWidth(0.8);
+  doc.line(M, 30, W - M, 30);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(22);
+  doc.setTextColor(brandR, brandG, brandB);
+  doc.text(M, 13, L.brand);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(inkR, inkG, inkB);
+  doc.text(M, 19, L.tagline);
+
+  doc.setFontSize(8);
+  const contactBits = [L.phone, L.email, L.address].filter(Boolean);
+  let cx = M;
+  for (const bit of contactBits) {
+    doc.text(cx, 25, bit);
+    cx += doc.getTextWidth(bit) + 6;
   }
-  const xrefAt = new TextEncoder().encode(out).length;
-  out += `xref\n0 ${maxId + 1}\n0000000000 65535 f \n`;
-  for (let id = 1; id <= maxId; id++) {
-    out += byId[id] ? `${String(offsets[id]).padStart(10, '0')} 00000 n \n` : '0000000000 00000 f \n';
-  }
-  out += `trailer\n<< /Size ${maxId + 1} /Root 1 0 R >>\nstartxref\n${xrefAt}\n%%EOF`;
-  return new TextEncoder().encode(out);
-}
 
-function fmtDt(iso) {
-  if (!iso) return '-';
+  // Right side of header: INVOICE title + meta
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.setTextColor(brandR, brandG, brandB);
+  doc.text(W - M, 12, "TAX INVOICE", { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(inkR, inkG, inkB);
+  const meta = [
+    `Invoice No.  ${L.invoiceNo}`,
+    `Date        ${L.date}`,
+    `Status      ${L.status}`,
+    `Payment     ${L.payment}`,
+  ];
+  for (const line of meta) {
+    doc.text(W - M, 20 + (meta.indexOf(line) * 4.6), line, { align: "right" });
+  }
+
+  // ---------- Bill To ----------
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(inkR, inkG, inkB);
+  doc.text(M, 40, "BILLED TO");
+  doc.setDrawColor(brandR, brandG, brandB);
+  doc.setLineWidth(0.4);
+  doc.line(M, 41.5, M + 45, 41.5);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  const cust = L.customer;
+  const addr = L.shippingAddr;
+  const custLines = [
+    `${cust.name || "Customer"}`,
+    `${cust.phone || ""}`,
+    `${cust.email || ""}`,
+    `${addr.address || ""}${addr.city ? ", " + addr.city : ""}${addr.pincode ? " — " + addr.pincode : ""}`,
+  ].filter(Boolean);
+  y = 34;
+  for (const cl of custLines) {
+    y += 5.5;
+    doc.text(M, y, cl);
+  }
+
+  // ---------- Items table ----------
+  y += 6;
+  const th = 7;
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.setFillColor(brandR, brandG, brandB);
+  doc.setTextColor(255, 255, 255);
+  doc.rect(M, y, CW, th, "F");
+  doc.text(M + 2, y + 4.6, "#");
+  doc.text(M + 10, y + 4.6, "ITEM");
+  doc.text(M + 62, y + 4.6, "QTY", { align: "center" });
+  doc.text(M + 80, y + 4.6, "RATE", { align: "center" });
+  doc.text(M + 108, y + 4.6, "AMOUNT", { align: "center" });
+  y += th;
+
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(inkR, inkG, inkB);
+  let n = 0;
+  for (const it of L.items) {
+    if (y > H - 40) {
+      doc.addPage();
+      y = M;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(inkR, inkG, inkB);
+      doc.text(M, y + 3, `${L.brand} — ${L.invoiceNo} (continued)`);
+      y += 8;
+      doc.setFont("helvetica", "normal");
+    }
+    n += 1;
+    const nameLines = wraps(doc, it.name, 92, 9);
+    let rowH = Math.max(th, nameLines.length * 4.2 + 2);
+    doc.setDrawColor(220, 214, 219);
+    doc.setLineWidth(0.2);
+    doc.line(M, y, W - M, y);
+    doc.setFontSize(9);
+    doc.text(M + 2, y + 4.6, String(n));
+    doc.text(M + 10, y + 4.6, nameLines[0]);
+    if (nameLines.length > 1) {
+      for (let li = 1; li < nameLines.length; li++) doc.text(M + 10, y + 4.6 + li * 4.2, nameLines[li]);
+    }
+    doc.text(M + 62, y + 4.6, String(it.qty), { align: "center" });
+    doc.text(M + 80, y + 4.6, MONEY(it.price), { align: "center" });
+    doc.text(M + 108, y + 4.6, MONEY(it.total), { align: "center" });
+    y += rowH;
+  }
+  doc.line(M, y, W - M, y);
+  y += 5;
+
+  // ---------- Totals ----------
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(M, y, "Subtotal");
+  doc.text(M + 108, y, MONEY(L.subtotal), { align: "center" });
+  y += 5.6;
+  doc.text(M, y, "Shipping");
+  doc.text(M + 108, y, L.shipping > 0 ? MONEY(L.shipping) : "FREE", { align: "center" });
+  y += 6.2;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.setTextColor(brandR, brandG, brandB);
+  doc.text(M, y, "TOTAL DUE");
+  doc.text(M + 108, y, MONEY(L.total), { align: "center" });
+
+  // ---------- QR code ----------
+  const qrTarget = `/admin?order=${encodeURIComponent(L.invoiceNo)}`;
+  const qrSide = 30;
   try {
-    const d = new Date(iso);
-    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) +
-      ', ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-  } catch { return String(iso); }
+    const qrData = await qrcode.toDataURL(qrTarget);
+    const qx = W - M - qrSide;
+    const qy = Math.min(y + 10, H - 52);
+    doc.setFillColor(250, 240, 243);
+    doc.rect(qx - 4, qy - 4, qrSide + 8, qrSide + 20, "F");
+    doc.addImage(qrData, "PNG", qx, qy, qrSide, qrSide);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(inkR, inkG, inkB);
+    doc.text(qx + qrSide / 2, qy + qrSide + 6, "Scan to open", { align: "center" });
+    doc.text(qx + qrSide / 2, qy + qrSide + 10.5, "order in admin", { align: "center" });
+  } catch (e) {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(8);
+    doc.setTextColor(160, 150, 154);
+    doc.text(W - M, y + 10, `QR: ${encodeURIComponent(qrTarget)}`, { align: "right" });
+  }
+
+  // ---------- Thank-you ----------
+  const ty = H - 34;
+  doc.setDrawColor(220, 214, 219);
+  doc.setLineWidth(0.3);
+  doc.line(M, ty, W - M, ty);
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(10);
+  doc.setTextColor(inkR, inkG, inkB);
+  doc.text(M, ty + 6, `Thank you for shopping with ${L.brand}!`);
+  doc.setFontSize(8);
+  doc.text(M, ty + 12, "This is a system-generated invoice. For order support, contact " + (L.phone || L.email || "the store"));
+
+  const buf = doc.output("arraybuffer");
+  return new Blob([buf], { type: "application/pdf" });
 }
 
-export function invoicePdfUrl(order, settings) {
-  const bytes = buildPdfBytes(order, settings);
-  const blob = new Blob([bytes], { type: 'application/pdf' });
+/** Returns an object URL for in-browser preview (async). Caller must revoke it. */
+export async function invoicePdfUrl(order, settings) {
+  const blob = await buildInvoicePdf(order, settings);
   return URL.createObjectURL(blob);
 }
 
-export function downloadInvoicePdf(order, settings) {
-  const url = invoicePdfUrl(order, settings);
-  const a = document.createElement('a');
+/** Generates the PDF and triggers a browser download. */
+export async function downloadInvoicePdf(order, settings) {
+  const blob = await buildInvoicePdf(order, settings);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
   a.href = url;
-  a.download = `invoice-${order.id}.pdf`;
-  document.body.appendChild(a);
+  a.download = `invoice-${order?.id || "download"}.pdf`;
   a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  window.setTimeout(() => URL.revokeObjectURL(url), 4000);
 }

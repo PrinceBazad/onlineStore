@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Navigate, Link } from 'react-router-dom';
+import { Navigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useData } from '../context/DataContext.jsx';
 import { formatINR, formatDateTime } from '../utils/format.js';
@@ -32,9 +32,14 @@ const emptyForm = {
 function InvoicePreviewModal({ order, settings, onClose }) {
   const [url, setUrl] = React.useState('');
   React.useEffect(() => {
-    const u = invoicePdfUrl(order, settings);
-    setUrl(u);
-    return () => URL.revokeObjectURL(u);
+    let u = null;
+    invoicePdfUrl(order, settings).then((url) => {
+      u = url;
+      setUrl(url);
+    });
+    return () => {
+      if (u) URL.revokeObjectURL(u);
+    };
   }, [order, settings]);
   return (
     <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
@@ -81,9 +86,24 @@ export default function Admin() {
   const [invoiceOrder, setInvoiceOrder] = useState(null);
   const [s, setS] = useState(settings);
   const [savedMsg, setSavedMsg] = useState('');
+  const [autoOpened, setAutoOpened] = useState(false);
+  const sp = useSearchParams();
+  const orderParam = sp.get('order');
+
+  React.useEffect(() => {
+    if (autoOpened || !orderParam) return;
+    const found = orders.find((o) => o.id === orderParam);
+    if (found) {
+      setAutoOpened(true);
+      setTab('orders');
+      setInvoiceOrder(found);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders, orderParam]);
 
   if (!isAdmin) {
-    return <Navigate to="/login" replace state={{ from: '/admin' }} />;
+    const from = orderParam ? `/admin?order=${orderParam}` : '/admin';
+    return <Navigate to="/login" replace state={{ from }} />;
   }
 
     const setSField = (k) => (e) => setS({ ...s, [k]: e.target.value });
