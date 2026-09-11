@@ -48,8 +48,8 @@ const wraps = (doc, text, maxW, size) => {
 async function buildInvoicePdf(order, settings) {
   const L = invoiceLines(order, settings);
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const W = doc.internalPageSize.getWidth();            // 210
-  const H = doc.internalPageSize.getHeight();           // 297
+  const W = doc.getPageWidth();                     // 210
+  const H = doc.getPageHeight();                    // 297
   const M = 14;                                         // margin
   const CW = W - M * 2;                                 // content width
   let y = 0;
