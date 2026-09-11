@@ -87,8 +87,8 @@ export default function Admin() {
   const [s, setS] = useState(settings);
   const [savedMsg, setSavedMsg] = useState('');
   const [autoOpened, setAutoOpened] = useState(false);
-  const sp = useSearchParams();
-  const orderParam = sp.get('order');
+  const [params] = useSearchParams();
+  const orderParam = params.get('order');
 
   React.useEffect(() => {
     if (autoOpened || !orderParam) return;
