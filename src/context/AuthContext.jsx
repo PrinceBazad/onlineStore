@@ -186,7 +186,9 @@ export function AuthProvider({ children }) {
       if (!STAFF_ROLES.includes(role) && role !== 'customer') {
         throw new Error('Unknown role.');
       }
-      await updateDoc(doc(firestore, 'users', String(uid).trim()), { role });
+      // setDoc+merge (not updateDoc) so promoting a user created directly in
+      // the Firebase console — who has no users/{uid} doc yet — also works.
+      await setDoc(doc(firestore, 'users', String(uid).trim()), { role }, { merge: true });
       return { ok: true };
     } catch (error) {
       throw new Error(error.message || 'Failed to update role.');
