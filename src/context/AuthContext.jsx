@@ -158,9 +158,12 @@ export function AuthProvider({ children }) {
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) throw new Error('No authenticated user.');
 
-      await setDoc(doc(firestore, 'users', firebaseUser.uid), data, { merge: true });
+      // Email (and identity/role) can never be changed from the profile page.
+      // Strip them so even a crafted call cannot overwrite the login email.
+      const { email, id, role, ...safeData } = data || {};
+      await setDoc(doc(firestore, 'users', firebaseUser.uid), safeData, { merge: true });
 
-      const updated = { ...user, ...data };
+      const updated = { ...user, ...safeData };
       setUser(updated);
       db.saveSession(updated);
       return updated;

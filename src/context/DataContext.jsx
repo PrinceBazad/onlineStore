@@ -171,6 +171,23 @@ export function DataProvider({ children }) {
     return true;
   };
 
+  // Orders that are still in progress (anything not delivered/cancelled).
+  // While the user has such an order, name + mobile editing is locked.
+  const TERMINAL_ORDER_STATUSES = ['delivered', 'cancelled'];
+  const isOrderProcessing = (o) => {
+    if (!o) return false;
+    return !TERMINAL_ORDER_STATUSES.includes(String(o.status || '').toLowerCase());
+  };
+  const hasProcessingOrdersForUser = (u) => {
+    if (!u) return false;
+    return orders.some((o) => {
+      const mine =
+        (o.userId && u.id && o.userId === u.id) ||
+        (o.customerEmail && u.email && String(o.customerEmail).toLowerCase() === String(u.email).toLowerCase());
+      return mine && isOrderProcessing(o);
+    });
+  };
+
   const cancelOrder = (orderId, refundInfo) => {
     const next = orders.map((o) =>
       o.id === orderId
@@ -230,6 +247,8 @@ export function DataProvider({ children }) {
       findOrder,
       canCancel,
       cancelOrder,
+      isOrderProcessing,
+      hasProcessingOrdersForUser,
       messages,
       addMessage,
       updateMessageStatus,
