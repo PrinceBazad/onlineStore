@@ -11,7 +11,7 @@ import ProductCard from '../components/ProductCard.jsx';
 export default function ProductDetail() {
   const { id } = useParams();
   const { products, reviewsFor, ratingFor, addReview } = useData();
-  const { addItem } = useCart();
+  const { addItem, cart } = useCart();
   const { user } = useAuth();
   const { isWishlisted, toggle } = useWishlist();
   const nav = useNavigate();
@@ -60,7 +60,8 @@ export default function ProductDetail() {
     );
   }
 
-  const soldOut = product.stock <= 0;
+  const soldOut = !product || product.stock <= 0;
+  const inCart = product ? cart.some((c) => c.id === product.id) : false;
   const saved = isWishlisted(product.id);
   const related = products.filter(
     (p) => p.category === product.category && p.id !== product.id
@@ -156,8 +157,8 @@ export default function ProductDetail() {
               <span>{qty}</span>
               <button onClick={() => setQty(qty + 1)}>+</button>
             </div>
-            <button className="btn btn-gold" disabled={soldOut} onClick={onAdd}>
-              Add to cart
+            <button className="btn btn-gold" disabled={soldOut} onClick={onAdd} style={inCart ? { background: 'var(--ok)', borderColor: 'var(--ok)' } : undefined}>
+              {soldOut ? 'Sold out' : inCart ? '✓ Added' : 'Add to cart'}
             </button>
             <button className={`btn btn-wish ${saved ? 'active' : ''}`} onClick={onWish}>
               {saved ? '♥ Saved' : '♡ Save'}
