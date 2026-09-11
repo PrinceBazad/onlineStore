@@ -191,7 +191,7 @@ async function buildInvoicePdf(order, settings) {
 
   // ---------- QR code ----------
   const base = window.location.origin || `${window.location.protocol}//${window.location.host}`;
-  const qrTarget = `${base}/#/admin?order=${encodeURIComponent(L.invoiceNo)}`;
+  const qrTarget = `${base}/#/order-manage/${encodeURIComponent(L.invoiceNo)}`;
   const qrSide = 30;
   try {
     const qrData = await qrcode.toDataURL(qrTarget);

@@ -17,6 +17,7 @@ import Checkout from './pages/Checkout.jsx';
 import Login from './pages/Login.jsx';
 import Signup from './pages/Signup.jsx';
 import OrderStatus from './pages/OrderStatus.jsx';
+import OrderManage from './pages/OrderManage.jsx';
 import MyOrders from './pages/MyOrders.jsx';
 import Wishlist from './pages/Wishlist.jsx';
 import Admin from './pages/Admin.jsx';
@@ -51,6 +52,7 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/track" element={<OrderStatus />} />
+              <Route path="/order-manage/:id" element={<OrderManage />} />
               <Route path="/orders" element={<MyOrders />} />
               <Route path="/wishlist" element={<Wishlist />} />
                             <Route path="/admin" element={<Admin />} />
