@@ -625,7 +625,12 @@ p { margin: 0 0 .8em; }
 .ord-head { display: flex; align-items: center; gap: 14px; padding: 12px 16px; background: #faf5f7; flex-wrap: wrap; }
 .ord-head .ord-total { margin-left: auto; font-weight: 600; }
 .ord-body { padding: 14px 16px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.ord-actions { display: flex; align-items: center; }
+.ord-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ord-id-btn { font-size: 1rem; }
+.invoice-modal iframe { display: block; }
+@media (max-width: 880px) {
+  .modal-card.invoice-modal { max-width: 100%; }
+}
 
 /* ── Features strip ─────────────────────── */
 .features { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; background: var(--ink); color: #fff; padding: 34px 22px; }

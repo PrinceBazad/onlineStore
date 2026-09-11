@@ -3,6 +3,7 @@ import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useData } from '../context/DataContext.jsx';
 import { formatINR, formatDateTime } from '../utils/format.js';
+import { invoicePdfUrl, downloadInvoicePdf } from '../utils/invoicePdf.js';
 import { productImage } from '../db.js';
 
 const CATS = ['Suits', 'Ethnic', 'Lehenga', 'Saree', 'Daily Wear'];
@@ -28,6 +29,48 @@ const emptyForm = {
   customImages: [],
 };
 
+function InvoicePreviewModal({ order, settings, onClose }) {
+  const [url, setUrl] = React.useState('');
+  React.useEffect(() => {
+    const u = invoicePdfUrl(order, settings);
+    setUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [order, settings]);
+  return (
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="modal-card invoice-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 860 }}>
+        <div className="modal-head">
+          <h2>Invoice — {order.id}</h2>
+          <button type="button" className="modal-close" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        <div style={{ padding: 16 }}>
+          <div className="row-gap" style={{ marginBottom: 12 }}>
+            <span className="muted">{formatDateTime(order.orderDate)} · {formatINR(order.total)}</span>
+            <span style={{ flex: 1 }} />
+            <button
+              type="button"
+              className="btn btn-sm btn-gold"
+              onClick={() => downloadInvoicePdf(order, settings)}
+            >
+              ⬇ Download PDF
+            </button>
+            <button type="button" className="btn btn-sm btn-ghost" onClick={onClose}>Close</button>
+          </div>
+          {url ? (
+            <iframe
+              title={`Invoice ${order.id}`}
+              src={url}
+              style={{ width: '100%', height: 520, border: '1px solid var(--line)', borderRadius: 8, background: '#fff' }}
+            />
+          ) : (
+            <p className="muted">Preparing PDF…</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Admin() {
   const { isAdmin } = useAuth();
   const { products, orders, settings, updateSettings, addProduct, updateProduct, deleteProduct, updateOrderStatus } = useData();
@@ -35,6 +78,7 @@ export default function Admin() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [msg, setMsg] = useState('');
+  const [invoiceOrder, setInvoiceOrder] = useState(null);
   const [s, setS] = useState(settings);
   const [savedMsg, setSavedMsg] = useState('');
 
@@ -389,7 +433,15 @@ export default function Admin() {
               {orders.map((o) => (
                 <div className="order-row" key={o.id}>
                   <div className="ord-head">
-                    <strong>Order {o.id}</strong>
+                    <button
+                      type="button"
+                      className="linklike ord-id-btn"
+                      title={`View invoice PDF for ${o.id}`}
+                      onClick={() => setInvoiceOrder(o)}
+                      style={{ fontWeight: 700 }}
+                    >
+                      Order {o.id}
+                    </button>
                     <span className="muted">{formatDateTime(o.orderDate)}</span>
                     <span className={`status-badge ${o.status}`}>{o.status.toUpperCase()}</span>
                     <span className="ord-total">{formatINR(o.total)} · {o.payment.mode}</span>
@@ -428,6 +480,14 @@ export default function Admin() {
                           <option value="cancelled">Cancelled</option>
                         </select>
                       </label>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-ghost"
+                        title={`View / download invoice PDF for ${o.id}`}
+                        onClick={() => setInvoiceOrder(o)}
+                      >
+                        🧾 Invoice
+                      </button>
                       {o.status === 'cancelled' && <span className="muted">Cancelled</span>}
                     </div>
                   </div>
@@ -535,6 +595,14 @@ export default function Admin() {
             <button className="btn btn-gold" type="submit">Save settings</button>
           </form>
         </section>
+      )}
+
+      {invoiceOrder && (
+        <InvoicePreviewModal
+          order={invoiceOrder}
+          settings={settings}
+          onClose={() => setInvoiceOrder(null)}
+        />
       )}
 
       </main>
