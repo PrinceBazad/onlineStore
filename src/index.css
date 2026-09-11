@@ -998,3 +998,27 @@ p { margin: 0 0 .8em; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+/* ── Staff portal: queue, dashboard, payment badges, timeline ── */
+.filter-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.chip.danger { border-color: var(--err); color: var(--err); }
+.chip.danger.active { background: var(--err); color: #fff; border-color: var(--err); }
+.queue-search {
+  width: 100%; max-width: 420px; padding: 10px 14px; margin-bottom: 16px;
+  border: 1px solid var(--line); border-radius: 30px; font-size: .95rem; background: #fff;
+}
+.orders-list { display: flex; flex-direction: column; gap: 12px; }
+.ord-actions .chip { min-width: 118px; text-align: center; }
+.pay-badge { padding: 3px 10px; border-radius: 20px; font-size: .72rem; font-weight: 700; letter-spacing: .4px; }
+.pay-badge.paid { background: #e6f5ec; color: #1f7a4d; border: 1px solid rgba(31,122,77,.25); }
+.pay-badge.pending { background: #fdf1e0; color: #b06d16; border: 1px solid rgba(176,109,22,.35); }
+.track-form input { padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; }
+.tl-row { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; }
+.tl-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--brand); flex: 0 0 auto; align-self: center; }
+.audit-list { list-style: none; margin: 8px 0 0; padding: 0; font-size: .9rem; }
+.audit-list li { padding: 6px 0; border-bottom: 1px dashed var(--line); }
+.note-input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; margin-top: 8px; }
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.stat-card { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: #fff; }
+.stat-card .num { font-size: 1.7rem; font-weight: 800; line-height: 1.1; }
+.stat-card .lbl { color: #777; font-size: .82rem; margin-top: 4px; }
+.stat-card.warn .num { color: #b06d16; }

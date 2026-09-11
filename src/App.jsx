@@ -21,6 +21,7 @@ import OrderManage from './pages/OrderManage.jsx';
 import MyOrders from './pages/MyOrders.jsx';
 import Wishlist from './pages/Wishlist.jsx';
 import Admin from './pages/Admin.jsx';
+import StaffDashboard from './pages/StaffDashboard.jsx';
 import Profile from './pages/Profile.jsx';
 import About from './pages/About.jsx';
 import Contact from './pages/Contact.jsx';
@@ -56,6 +57,7 @@ export default function App() {
               <Route path="/orders" element={<MyOrders />} />
               <Route path="/wishlist" element={<Wishlist />} />
                             <Route path="/admin" element={<Admin />} />
+              <Route path="/dashboard" element={<StaffDashboard />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />

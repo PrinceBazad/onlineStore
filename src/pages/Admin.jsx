@@ -3,8 +3,10 @@ import { Navigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useData } from '../context/DataContext.jsx';
 import { formatINR, formatDateTime } from '../utils/format.js';
-import { invoicePdfUrl, downloadInvoicePdf } from '../utils/invoicePdf.js';
+import { invoicePdfUrl, downloadInvoicePdf, downloadPackingSlip } from '../utils/invoicePdf.js';
 import { productImage } from '../db.js';
+import OrdersQueue from '../components/OrdersQueue.jsx';
+import { statusMeta } from '../orderFlow.js';
 
 const CATS = ['Suits', 'Ethnic', 'Lehenga', 'Saree', 'Daily Wear'];
 const ALL_PAY = [
@@ -76,10 +78,61 @@ function InvoicePreviewModal({ order, settings, onClose }) {
   );
 }
 
+const STAFF_ROLE_CHOICES = ['packer', 'shipper', 'support', 'manager', 'admin', 'customer'];
+
+function StaffRoleForm({ setUserRole }) {
+  const [uid, setUid] = useState('');
+  const [role, setRole] = useState('packer');
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setMsg('');
+    setErr('');
+    try {
+      await setUserRole(uid.trim(), role);
+      setMsg('Role saved: ' + uid.trim() + ' is now "' + role + '". Applies on their next login/reload.');
+      setUid('');
+    } catch (ex) {
+      setErr(ex.message || 'Failed to update role.');
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="form">
+      <div className="grid2">
+        <label>
+          Firebase UID
+          <input
+            value={uid}
+            onChange={(e) => setUid(e.target.value)}
+            required
+            placeholder="e.g. 3XkQ9Z... (Firebase console > Authentication)"
+          />
+        </label>
+        <label>
+          Role
+          <select value={role} onChange={(e) => setRole(e.target.value)}>
+            {STAFF_ROLE_CHOICES.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="row-gap">
+        <button className="btn btn-gold" type="submit">Save role</button>
+      </div>
+      {msg && <p className="ok">{msg}</p>}
+      {err && <p className="error">{err}</p>}
+    </form>
+  );
+}
+
 export default function Admin() {
-  const { isAdmin } = useAuth();
+  const { user, isAdmin, isStaff, setUserRole } = useAuth();
   const { products, orders, settings, updateSettings, addProduct, updateProduct, deleteProduct, updateOrderStatus } = useData();
-  const [tab, setTab] = useState('products');
+  const [tab, setTab] = useState(isAdmin ? 'products' : 'orders');
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [msg, setMsg] = useState('');
@@ -101,7 +154,7 @@ export default function Admin() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders, orderParam]);
 
-  if (!isAdmin) {
+  if (!isStaff) {
     const from = orderParam ? `/admin?order=${orderParam}` : '/admin';
     return <Navigate to="/login" replace state={{ from }} />;
   }
@@ -266,15 +319,25 @@ export default function Admin() {
       </div>
 
       <div className="admin-tabs">
-        <button className={tab === 'products' ? 'chip active' : 'chip'} onClick={() => setTab('products')}>
-          Products ({products.length})
-        </button>
+        {isAdmin && (
+          <button className={tab === 'products' ? 'chip active' : 'chip'} onClick={() => setTab('products')}>
+            Products ({products.length})
+          </button>
+        )}
         <button className={tab === 'orders' ? 'chip active' : 'chip'} onClick={() => setTab('orders')}>
           Orders ({orders.length})
         </button>
-        <button className={tab === 'settings' ? 'chip active' : 'chip'} onClick={() => setTab('settings')}>
-          Settings
-        </button>
+        {isAdmin && (
+          <button className={tab === 'settings' ? 'chip active' : 'chip'} onClick={() => setTab('settings')}>
+            Settings
+          </button>
+        )}
+        {isAdmin && (
+          <button className={tab === 'staff' ? 'chip active' : 'chip'} onClick={() => setTab('staff')}>
+            Staff
+          </button>
+        )}
+        <Link to="/dashboard" className="chip">Live board</Link>
       </div>
 
       {tab === 'products' && (
@@ -445,78 +508,34 @@ export default function Admin() {
       )}
       {tab === 'orders' && (
         <section className="card-box">
-          <h2>All orders</h2>
+          <h2>Orders queue</h2>
           {orders.length === 0 ? (
             <p className="muted">No orders yet. Orders placed by customers will appear here.</p>
           ) : (
-            <div className="orders-list">
-              {orders.map((o) => (
-                <div className="order-row" key={o.id}>
-                  <div className="ord-head">
-                    <button
-                      type="button"
-                      className="linklike ord-id-btn"
-                      title={`View invoice PDF for ${o.id}`}
-                      onClick={() => setInvoiceOrder(o)}
-                      style={{ fontWeight: 700 }}
-                    >
-                      Order {o.id}
-                    </button>
-                    <span className="muted">{formatDateTime(o.orderDate)}</span>
-                    <span className={`status-badge ${o.status}`}>{o.status.toUpperCase()}</span>
-                    <span className="ord-total">{formatINR(o.total)} · {o.payment.mode}</span>
-                  </div>
-                  <div className="ord-body">
-                    <div>
-                      <p className="muted">{o.customer?.name} · {o.customer?.phone}</p>
-                      <p className="muted">{o.shipping?.address}, {o.shipping?.city} — {o.shipping?.pincode}</p>
-                      <ul className="sum-items">
-                        {o.items.map((it) => (
-                          <li key={it.id}><span>{it.name} × {it.qty}</span></li>
-                        ))}
-                      </ul>
-                    </div>
-                    <div className="ord-actions">
-                      <label className="ord-status-set">
-                        <span className="muted">Status:</span>
-                        <select
-                          value={o.status}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val === o.status) return;
-                            const label = val.charAt(0).toUpperCase() + val.slice(1);
-                            if (val === 'cancelled' && !window.confirm(`Cancel order ${o.id}? This cannot be undone.`)) {
-                              e.target.value = o.status;
-                              return;
-                            }
-                            updateOrderStatus(o.id, val, label);
-                          }}
-                        >
-                          <option value="placed">Placed</option>
-                          <option value="confirmed">Confirmed</option>
-                          <option value="packed">Packed</option>
-                          <option value="shipped">Shipped</option>
-                          <option value="delivered">Delivered</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
-                      </label>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-ghost"
-                        title={`View / download invoice PDF for ${o.id}`}
-                        onClick={() => setInvoiceOrder(o)}
-                      >
-                        🧾 Invoice
-                      </button>
-                      {o.status === 'cancelled' && <span className="muted">Cancelled</span>}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <OrdersQueue
+              orders={orders}
+              role={user?.role || 'admin'}
+              user={user}
+              onUpdate={(o, status, opts) => updateOrderStatus(o.id, status, statusMeta(status).label, opts)}
+              onInvoice={(o) => setInvoiceOrder(o)}
+              onPackSlip={(o) => downloadPackingSlip(o, settings)}
+            />
           )}
         </section>
       )}
+
+      {tab === 'staff' && (
+        <section className="card-box">
+          <h2>Staff roles</h2>
+          <p className="muted small">
+            Promote a registered user to a staff role. The UID is visible in the Firebase console
+            (Authentication &gt; Users) after the person logs in on the site once. The new role
+            applies on their next login or page reload.
+          </p>
+          <StaffRoleForm setUserRole={setUserRole} />
+        </section>
+      )}
+
     {tab === 'settings' && (
         <section className="card-box">
           <h2>Store settings</h2>

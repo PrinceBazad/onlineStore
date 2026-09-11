@@ -16,7 +16,7 @@ const links = [
 ];
 
 export default function Navbar({ onCartOpen }) {
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, isStaff, logout } = useAuth();
   const { totalItems } = useCart();
   const { count: savedCount } = useWishlist();
   const { settings } = useData();
@@ -58,6 +58,11 @@ export default function Navbar({ onCartOpen }) {
           {isAdmin && (
             <li>
               <Link to="/admin">Admin</Link>
+            </li>
+          )}
+          {isStaff && (
+            <li>
+              <Link to="/dashboard">Live board</Link>
             </li>
           )}
         </ul>
@@ -110,6 +115,7 @@ export default function Navbar({ onCartOpen }) {
         {user && <Link to="/orders" onClick={closeMenu}>My Orders</Link>}
         {user && <Link to="/wishlist" onClick={closeMenu}>Saved{savedCount ? ` (${savedCount})` : ''}</Link>}
         {isAdmin && <Link to="/admin" onClick={closeMenu}>Admin</Link>}
+        {isStaff && <Link to="/dashboard" onClick={closeMenu}>Live board</Link>}
         {user ? (
           <button className="linklike mobile-logout" onClick={() => { logout(); closeMenu(); }}>
             Logout

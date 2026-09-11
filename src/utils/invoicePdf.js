@@ -277,3 +277,122 @@ export async function downloadInvoicePdf(order, settings) {
   a.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
+/** Compact picking/packing slip — no prices, just items + checklist info (Step 7). */
+async function buildPackingSlip(order, settings) {
+  const L = invoiceLines(order, settings);
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const W = doc.getPageWidth();
+  const H = doc.getPageHeight();
+  const M = 14;
+  const CW = W - M * 2;
+  const brandR = 155, brandG = 28, brandB = 61;
+  const inkR = 43, inkG = 34, inkB = 38;
+
+  doc.setFillColor(250, 240, 243);
+  doc.rect(0, 0, W, 26, "F");
+  doc.setDrawColor(brandR, brandG, brandB);
+  doc.setLineWidth(0.8);
+  doc.line(M, 26, W - M, 26);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.setTextColor(brandR, brandG, brandB);
+  doc.text(M, 12, L.brand);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(inkR, inkG, inkB);
+  doc.text(M, 18, L.address || L.phone || L.email || "");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text(W - M, 12, "PACKING SLIP", { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(W - M, 18, L.invoiceNo + " · " + L.date, { align: "right" });
+
+  let y = 34;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text(M, y, "SHIP TO");
+  doc.setFont("helvetica", "normal");
+  y += 5.5;
+  const addr = L.shippingAddr;
+  const shipLines = [
+    L.customer?.name,
+    L.customer?.phone,
+    [addr.address, addr.city, addr.state, addr.pincode].filter(Boolean).join(", "),
+  ].filter(Boolean);
+  for (const ln of shipLines) {
+    doc.text(M, y, ln);
+    y += 5.5;
+  }
+  y += 4;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setFillColor(brandR, brandG, brandB);
+  doc.setTextColor(255, 255, 255);
+  doc.rect(M, y, CW, 7, "F");
+  doc.text(M + 2, y + 4.6, "ITEM");
+  doc.text(M + 150, y + 4.6, "QTY", { align: "right" });
+  y += 7;
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(inkR, inkG, inkB);
+  let n = 0;
+  for (const it of L.items) {
+    n += 1;
+    const nameLines = wraps(doc, it.name, 120, 9);
+    const rowH = Math.max(7, nameLines.length * 4.2 + 2);
+    if (y + rowH > H - 46) {
+      doc.addPage();
+      y = M + 6;
+    }
+    doc.setDrawColor(220, 214, 219);
+    doc.setLineWidth(0.2);
+    doc.line(M, y, W - M, y);
+    doc.text(M + 2, y + 4.6, String(n));
+    doc.text(M + 8, y + 4.6, nameLines[0]);
+    if (nameLines.length > 1) {
+      for (let li = 1; li < nameLines.length; li++) doc.text(M + 8, y + 4.6 + li * 4.2, nameLines[li]);
+    }
+    doc.text(M + 150, y + 4.6, String(it.qty), { align: "right" });
+    y += rowH;
+  }
+  doc.line(M, y, W - M, y);
+  y += 6;
+
+  const totalQty = L.items.reduce((a, b) => a + b.qty, 0);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(brandR, brandG, brandB);
+  doc.text(M, y, "Total items: " + L.items.length + "   ·   Total qty: " + totalQty);
+  y += 8;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(inkR, inkG, inkB);
+  doc.text(M, y, "☐  All items above are packed in the order");
+  y += 6;
+  doc.text(M, y, "☐  Invoice slip included in the package");
+  y += 6;
+  doc.text(M, y, "☐  Package sealed and dispatched");
+
+  const buf = doc.output("arraybuffer");
+  return new Blob([buf], { type: "application/pdf" });
+}
+
+/** Returns an object URL for in-browser preview (async). Caller must revoke it. */
+export async function packingSlipUrl(order, settings) {
+  const blob = await buildPackingSlip(order, settings);
+  return URL.createObjectURL(blob);
+}
+
+/** Generates the packing-slip PDF and triggers a browser download. */
+export async function downloadPackingSlip(order, settings) {
+  const blob = await buildPackingSlip(order, settings);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `packing-slip-${order?.id || "download"}.pdf`;
+  a.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+}

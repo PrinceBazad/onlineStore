@@ -160,6 +160,20 @@ export function DataProvider({ children }) {
     const next = [order, ...orders];
     setOrders(next);
     db.saveOrders(next);
+    // Order confirmation e-mail (fire-and-forget; skips when no mail API configured).
+    postApi('/api/send-order-mail', {
+      type: 'confirmed',
+      to: order.customerEmail || order.customer?.email,
+      order: {
+        id: order.id,
+        customerEmail: order.customerEmail || order.customer?.email,
+        customerName: order.customer?.name,
+        total: order.total,
+        paymentMode: order.payment?.mode,
+        orderDate: order.orderDate,
+        storeName: settings.storeName,
+      },
+    });
     return order;
   };
 
@@ -210,21 +224,86 @@ export function DataProvider({ children }) {
     db.saveOrders(next);
   };
 
-  const updateOrderStatus = (id, status, label) => {
+  const updateOrderStatus = (id, status, label, opts = {}) => {
+    const at = new Date().toISOString();
+    const by = opts.by
+      ? {
+          uid: opts.by.uid || opts.by.id,
+          name: opts.by.name || opts.by.email || 'staff',
+          role: opts.by.role || 'staff',
+        }
+      : null;
+    let prevStatus = null;
+    let changed = null;
+    const next = orders.map((o) => {
+      if (o.id !== id) return o;
+      prevStatus = o.status;
+      changed = {
+        ...o,
+        status,
+        trackingNo: opts.trackingNo !== undefined ? opts.trackingNo : o.trackingNo,
+        courier: opts.courier !== undefined ? opts.courier : o.courier,
+        statusHistory: [
+          ...(o.statusHistory || []),
+          { status, label: label || status, by, note: opts.note || '', at },
+        ],
+      };
+      return changed;
+    });
+    setOrders(next);
+    db.saveOrders(next);
+
+    if (changed) {
+      // Server-side audit + status e-mail (fire-and-forget; safe when the API is missing).
+      postApi('/api/update-order-status', {
+        orderId: id,
+        status,
+        label: label || status,
+        note: opts.note || '',
+        trackingNo: changed.trackingNo || '',
+        courier: changed.courier || '',
+        previousStatus: prevStatus,
+        by,
+        orderInfo: {
+          id: changed.id,
+          customerEmail: changed.customerEmail || changed.customer?.email,
+          customerName: changed.customer?.name,
+          total: changed.total,
+          paymentMode: changed.payment?.mode,
+          orderDate: changed.orderDate,
+          storeName: settings.storeName,
+        },
+      });
+    }
+  };
+
+  // Internal (staff) notes on an order — visible to every staff member.
+  const addOrderNote = (orderId, note, by) => {
+    if (!note || !String(note).trim()) return;
+    const entry = {
+      id: db.uid('N-'),
+      by: by ? { uid: by.uid || by.id, name: by.name || by.email || 'staff' } : null,
+      note: String(note).trim(),
+      at: new Date().toISOString(),
+    };
     const next = orders.map((o) =>
-      o.id === id
-        ? {
-            ...o,
-            status,
-            statusHistory: [
-              ...o.statusHistory,
-              { status, label, at: new Date().toISOString() },
-            ],
-          }
-        : o
+      o.id === orderId ? { ...o, notes: [...(o.notes || []), entry] } : o
     );
     setOrders(next);
     db.saveOrders(next);
+  };
+
+  // Best-effort calls to the Vercel API functions. Never blocks the store.
+  const postApi = async (path, body) => {
+    try {
+      await fetch(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      /* dev/offline — server API is optional */
+    }
   };
 
   const findOrder = (id) => orders.find((o) => o.id.toLowerCase() === id.toLowerCase());
@@ -244,6 +323,7 @@ export function DataProvider({ children }) {
       deleteProduct,
       placeOrder,
       updateOrderStatus,
+      addOrderNote,
       findOrder,
       canCancel,
       cancelOrder,

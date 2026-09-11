@@ -3,6 +3,7 @@ import { db } from '../db.js';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendPasswordResetEmail } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { app } from '../firebase.js';
+import { STAFF_ROLES, ROLE_LABELS, isStaffRole } from '../orderFlow.js';
 
 const AuthContext = createContext(null);
 const auth = getAuth(app);
@@ -173,12 +174,34 @@ export function AuthProvider({ children }) {
   };
 
   const isAdmin = user?.role === 'admin';
+  const isStaff = isStaffRole(user?.role);
+
+  // Admin-only: promote a Firebase user to a staff role by their UID.
+  // (UID visible in Firebase console → Authentication → Users.)
+  const setUserRole = async (uid, role) => {
+    try {
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) throw new Error('No authenticated user.');
+      if (!isAdmin) throw new Error('Only the admin can manage staff roles.');
+      if (!STAFF_ROLES.includes(role) && role !== 'customer') {
+        throw new Error('Unknown role.');
+      }
+      await updateDoc(doc(firestore, 'users', String(uid).trim()), { role });
+      return { ok: true };
+    } catch (error) {
+      throw new Error(error.message || 'Failed to update role.');
+    }
+  };
 
   return (
     <AuthContext.Provider
       value={{
         user,
         isAdmin,
+        isStaff,
+        setUserRole,
+        STAFF_ROLES,
+        ROLE_LABELS,
         signup,
         login,
         logout,
