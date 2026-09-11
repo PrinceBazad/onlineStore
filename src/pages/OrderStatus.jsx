@@ -1,23 +1,30 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams, Navigate, useNavigate } from 'react-router-dom';
 import { useData } from '../context/DataContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+
 import { formatINR, formatDateTime } from '../utils/format.js';
+
+
+const ORD_TIMELINE = [
+  { status: 'placed', label: 'Order Placed' },
+  { status: 'confirmed', label: 'Confirmed' },
+  { status: 'packed', label: 'Packed' },
+  { status: 'shipped', label: 'Shipped' },
+  { status: 'delivered', label: 'Delivered' },
+];
 
 export default function OrderStatus() {
   const { user } = useAuth();
-  const { findOrder, canCancel, cancelTimeRemaining, cancelOrder } = useData();
+  const { findOrder, canCancel, cancelOrder } = useData();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [query, setQuery] = useState('');
   const [order, setOrder] = useState(null);
   const [notFound, setNotFound] = useState(false);
-  const [remaining, setRemaining] = useState(null);
-  const timerRef = useRef(null);
+  const [err, setErr] = useState('');
+  const [cancelling, setCancelling] = useState(false);
 
-  // NOTE: all hooks MUST be called on every render — React forbids
-  // returning early before a hook (error #300). The auth redirect below
-  // is therefore placed AFTER every useState/useEffect call.
   useEffect(() => {
     const q = params.get('order');
     if (q) {
@@ -26,8 +33,7 @@ export default function OrderStatus() {
       setOrder(found || null);
       setNotFound(!found);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params]);
+  }, [params, findOrder]);
 
   if (!user) {
     return <Navigate to="/login" replace state={{ from: '/track' }} />;
@@ -40,40 +46,65 @@ export default function OrderStatus() {
     setNotFound(!found);
   };
 
-  const timeline = [
-    { status: 'placed', label: 'Order Placed' },
-    { status: 'confirmed', label: 'Confirmed' },
-    { status: 'shipped', label: 'Shipped' },
-    { status: 'delivered', label: 'Delivered' },
-  ];
   const currentIndex = order
-    ? timeline.findIndex((t) => t.status === order.status)
+    ? ORD_TIMELINE.findIndex((t) => t.status === order.status)
     : -1;
 
   const eligible = order && canCancel(order);
+  const latestStatus = order?.status || '';
+  const isPacked = latestStatus === 'packed';
+  const isShippedOrLater = latestStatus === 'shipped' || latestStatus === 'delivered';
 
-  useEffect(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = null;
-    if (!eligible) {
-      setRemaining(null);
+  const onCancel = async (e) => {
+    e.preventDefault();
+    if (!eligible || cancelling) return;
+    const latest = findOrder(order.id);
+    const st = latest?.status || order.status;
+    if (['packed', 'shipped', 'delivered', 'cancelled'].includes(st)) {
+      setErr('This order can no longer be cancelled (current status: ' + st + ').');
+      if (latest) setOrder(latest);
       return;
     }
-    // Recompute remaining time every second so the displayed MM:SS
-    // actually decrements on screen.
-    const tick = () => {
-      setRemaining(cancelTimeRemaining(order));
-    };
-    tick();
-    timerRef.current = setInterval(tick, 1000);
-    return () => clearInterval(timerRef.current);
-  }, [order && order.id, eligible]);
-
-  const onCancel = (e) => {
-    e.preventDefault();
-    if (!eligible) return;
-    cancelOrder(order.id);
-    navigate('/orders');
+    setCancelling(true);
+    setErr('');
+    try {
+      const payRef = order?.payment?.ref ? String(order.payment.ref) : '';
+      const isOnlinePayment =
+        order?.payment?.gateway === 'Razorpay' && payRef.startsWith('pay_');
+      let refundInfo = null;
+      if (isOnlinePayment) {
+        const res = await fetch('/api/refund', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: order.id,
+            paymentRef: payRef,
+            amount: order.total,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.refunded) {
+          throw new Error(data.error || 'Refund failed. Please contact support.');
+        }
+        refundInfo = {
+          type: 'razorpay_refund',
+          refundId: data.refundId || null,
+          refundedAt: new Date().toISOString(),
+          note: 'Refund initiated to the original payment method. It will be credited back to the same account in 5-7 working days.',
+        };
+      } else {
+        refundInfo = {
+          type: 'no_payment_refund',
+          refundedAt: new Date().toISOString(),
+          note: 'No online payment was made for this order, so no refund was needed.',
+        };
+      }
+      cancelOrder(order.id, refundInfo);
+      navigate('/orders', { state: { cancelledOrder: order.id, refundInfo } });
+    } catch (ex) {
+      setErr(ex.message || 'Could not cancel this order.');
+      setCancelling(false);
+    }
   };
 
   const ownsOrder =
@@ -112,7 +143,7 @@ export default function OrderStatus() {
           </div>
 
           <div className="timeline">
-            {timeline.map((t, i) => {
+            {ORD_TIMELINE.map((t, i) => {
               const done = i <= currentIndex;
               const isCurrent = i === currentIndex;
               return (
@@ -152,42 +183,62 @@ export default function OrderStatus() {
             </div>
           </div>
 
-          {eligible ? (
-            <div className="cancel-box">
-              <h3>Cancel this order</h3>
-              {remaining ? (
+          {order.status === 'cancelled' ? (
+            <div className="cancel-box cant">
+              <h3>Order Cancelled</h3>
+              {order.refundInfo && (
                 <>
-                  <div className="cancel-row">
-                    <div>
-                      <p className="muted tiny">Time remaining to cancel</p>
-                      <p className="cancel-count">
-                        {String(remaining.mins).padStart(2, '0')}:{' '}
-                        {String(remaining.secs).padStart(2, '0')}
-                      </p>
-                    </div>
-                    <button
-                      className="btn btn-block cancel-btn"
-                      onClick={onCancel}
-                    >
-                      Cancel order · {formatINR(order.total)}
-                    </button>
-                  </div>
-                  <p className="cancel-explain">
-                    You can cancel this order within 1 hour of placing it. After that, cancellation is not available.
-                  </p>
+                  <p><strong>Refund:</strong> {order.refundInfo.type === 'razorpay_refund' ? 'Refund initiated' : 'No refund needed'}</p>
+                  <p>{order.refundInfo.note}</p>
+                  {order.refundInfo.refundId && <p className="muted tiny">Refund ID: {order.refundInfo.refundId}</p>}
+                  {order.refundInfo.type === 'razorpay_refund' && (
+                    <p className="cancel-explain">The money will be credited back to the same account or payment method you used for this order in 5-7 working days.</p>
+                  )}
                 </>
-              ) : (
-                <p className="cancel-explain">This order can be cancelled within 1 hour of placing it. Time has expired.</p>
               )}
             </div>
-          ) : ownsOrder ? (
+          ) : isPacked ? (
             <div className="cancel-box cant">
-              <h3>Cancellation window closed</h3>
+              <h3>Cannot Cancel - Order Packed</h3>
               <p className="cancel-explain">
-                This order was placed more than 1 hour ago and can no longer be cancelled.
+                This order has been packed and is being prepared for shipment. Cancellation is not available once the order is packed.
               </p>
             </div>
-          ) : null}
+          ) : isShippedOrLater ? (
+            <div className="cancel-box cant">
+              <h3>Cannot Cancel - Order Shipped</h3>
+              <p className="cancel-explain">
+                This order has already been shipped. Cancellation is not available for shipped orders.
+              </p>
+            </div>
+          ) : ownsOrder && eligible ? (
+            <div className="cancel-box">
+              <h3>Cancel this order</h3>
+              <div className="cancel-row">
+                <div>
+                  <p className="muted tiny">You can cancel this order before it is packed.</p>
+                </div>
+                <button
+                  className="btn btn-block cancel-btn"
+                  onClick={onCancel}
+                  disabled={cancelling}
+                >
+                  {cancelling ? 'Cancelling...' : `Cancel order - ${formatINR(order.total)}`}
+                </button>
+              </div>
+              {err && <p className="error" style={{ marginTop: 8 }}>{err}</p>}
+              <p className="cancel-explain">
+                If you cancel, the order will be cancelled and any online payment will be refunded to the original payment method.
+              </p>
+            </div>
+          ) : (
+            <div className="cancel-box cant">
+              <h3>Cancellation Not Available</h3>
+              <p className="cancel-explain">
+                You can only cancel orders that are in Placed or Confirmed status and belong to your account.
+              </p>
+            </div>
+          )}
         </div>
       )}
     </main>

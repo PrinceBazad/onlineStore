@@ -91,6 +91,60 @@ app.post('/api/verify-payment', (req, res) => {
   }
 });
 
+// Refund a Razorpay payment (server-side, uses secret key)
+// Expected body: { orderId, paymentRef, amount }
+// Razorpay refund credits the money back to the customer's original payment source.
+app.post('/api/refund', async (req, res) => {
+  console.log('[refund] received:', JSON.stringify(req.body));
+  try {
+    const { orderId, paymentRef, amount } = req.body;
+    if (!orderId || !paymentRef || !amount) {
+      return res.status(400).json({ error: 'Missing orderId, paymentRef, or amount' });
+    }
+
+    const amountInRupees = Number(amount);
+    if (!amountInRupees || amountInRupees <= 0) {
+      return res.status(400).json({ error: 'Invalid amount' });
+    }
+
+    // Only refund real Razorpay payments (ref looks like pay_xxxxxx)
+    if (!paymentRef || !String(paymentRef).startsWith('pay_')) {
+      return res.json({
+        refunded: false,
+        reason: 'no_online_payment',
+        message: 'No Razorpay payment to refund. This order was COD or a demo payment - no money was charged.',
+      });
+    }
+
+    const refund = await razorpay.payments.refund(paymentRef, {
+      amount: Math.round(amountInRupees * 100), // paise
+      receipt: 'refund_' + orderId,
+      notes: { orderId },
+    });
+
+    console.log('[refund] success, refund =', refund.id, 'status =', refund.status);
+    res.json({
+      refunded: true,
+      refundId: refund.id,
+      amount: refund.amount,
+      status: refund.status,
+      message: 'Refund initiated. The money will be credited back to your account in 5-7 working days.',
+    });
+  } catch (err) {
+    console.error('refund error:', err);
+    const message =
+      err?.details?.description ||
+      err?.response?.description ||
+      err?.message ||
+      'Refund failed';
+    res.status(500).json({
+      refunded: false,
+      reason: 'refund_failed',
+      message,
+    });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Payment server running on port ${PORT}`);
   console.log(`Using Razorpay key: ${RAZORPAY_KEY_ID}`);

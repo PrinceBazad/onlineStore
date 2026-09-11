@@ -571,6 +571,7 @@ p { margin: 0 0 .8em; }
 .status-badge { background: var(--brand); color: #fff; padding: 5px 14px; border-radius: 30px; font-size: .78rem; letter-spacing: .5px; }
 .status-badge.confirmed { background: #b06d16; }
 .status-badge.shipped { background: var(--brand-dark); }
+.status-badge.packed { background: #7a4fa3; }
 .status-badge.delivered { background: #1f7a4d; }
 .status-badge.cancelled { background: #8a8a8a; }
 

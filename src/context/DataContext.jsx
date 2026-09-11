@@ -163,31 +163,32 @@ export function DataProvider({ children }) {
     return order;
   };
 
-  const CANCEL_WINDOW_MS = 1 * 60 * 60 * 1000; // 1 hour
-
   const canCancel = (order) => {
     if (!order) return false;
-    if (order.status === 'cancelled' || order.status === 'shipped' || order.status === 'delivered') {
+    if (order.status === 'cancelled' || order.status === 'packed' || order.status === 'shipped' || order.status === 'delivered') {
       return false;
     }
-    const orderTime = new Date(order.orderDate).getTime();
-    const elapsed = Date.now() - orderTime;
-    return elapsed < CANCEL_WINDOW_MS;
+    return true;
   };
 
-  const cancelTimeRemaining = (order) => {
-    if (!canCancel(order)) return null;
-    const orderTime = new Date(order.orderDate).getTime();
-    const elapsed = Date.now() - orderTime;
-    const remaining = CANCEL_WINDOW_MS - elapsed;
-    if (remaining <= 0) return null;
-    const mins = Math.floor(remaining / 60000);
-    const secs = Math.floor((remaining % 60000) / 1000);
-    return { mins, secs, total: remaining };
-  };
-
-  const cancelOrder = (orderId) => {
-    const next = orders.filter((o) => o.id !== orderId);
+  const cancelOrder = (orderId, refundInfo) => {
+    const next = orders.map((o) =>
+      o.id === orderId
+        ? {
+            ...o,
+            status: 'cancelled',
+            statusHistory: [
+              ...(o.statusHistory || []),
+              { status: 'cancelled', label: 'Cancelled by customer', at: new Date().toISOString() },
+            ],
+            refundInfo: refundInfo || {
+              type: 'self_cancel',
+              cancelledAt: new Date().toISOString(),
+              note: 'Cancelled by customer.',
+            },
+          }
+        : o
+    );
     setOrders(next);
     db.saveOrders(next);
   };
@@ -228,7 +229,6 @@ export function DataProvider({ children }) {
       updateOrderStatus,
       findOrder,
       canCancel,
-      cancelTimeRemaining,
       cancelOrder,
       messages,
       addMessage,
