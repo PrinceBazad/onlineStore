@@ -647,7 +647,16 @@ export default function Admin() {
                         <td><strong>{c.code}</strong></td>
                         <td>{c.type === 'percent' ? `${c.value}% off` : `${formatINR(c.value)} off`}</td>
                         <td>{c.minOrder ? formatINR(c.minOrder) : '—'}</td>
-                        <td>{c.usedCount || 0}</td>
+                        {(() => {
+                          // "Used" is counted straight from the ORDERS collection
+                          // (source of truth) — it updates live and can never
+                          // drift or be overwritten by a stale device snapshot.
+                          const used = orders.filter(
+                            (o) => o.couponCode &&
+                              String(o.couponCode).toUpperCase() === String(c.code).toUpperCase()
+                          ).length;
+                          return <td title={`${used} order${used === 1 ? '' : 's'} used this code`}>{used}</td>;
+                        })()}
                         <td>
                           <span className={`status-badge ${c.active ? 'confirmed' : 'cancelled'}`}>
                             {c.active ? 'Active' : 'Paused'}

@@ -188,8 +188,11 @@ export function DataProvider({ children }) {
   const markCouponUsed = (code) => {
     const norm = String(code || '').trim().toUpperCase();
     if (!norm) return;
+    // Read the freshest PERSISTED coupon list (not the closure's possibly-stale
+    // state array) so a stale tab snapshot can't swallow the increment.
+    const fresh = db.getCoupons();
     saveCoupons(
-      coupons.map((c) =>
+      fresh.map((c) =>
         c.code === norm ? { ...c, usedCount: (c.usedCount || 0) + 1 } : c
       )
     );
