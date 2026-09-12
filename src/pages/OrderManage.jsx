@@ -87,7 +87,7 @@ export default function OrderManage() {
       setDhlMsg(r.error || 'Booking failed.');
       return;
     }
-    setDhlMsg(`Waybill ${r.waybill} created. Confirm "Ship" below.`);
+    setDhlMsg(`Waybill ${r.waybill} created${r.demo ? ' (DEMO MODE — simulated Delhivery, no real shipment)' : ''}. Confirm "Ship" below.`);
     mergeDelhivery(order.id, { awb: r.waybill, labelUrl: r.labelUrl || '' });
     setTracking({ courier: 'Delhivery', trackingNo: r.waybill, open: true, labelUrl: r.labelUrl || '' });
     if (r.labelUrl) window.open(r.labelUrl, '_blank', 'noopener');

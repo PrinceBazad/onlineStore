@@ -18,8 +18,13 @@
 // while testing, and remove it when going live.
 const BASE = String(process.env.DELHIVERY_API_BASE || 'https://track.delhivery.com').replace(/\/+$/, '');
 
+export function isDemo() {
+  const d = String(process.env.DELHIVERY_DEMO || '').toLowerCase();
+  return d === '1' || d === 'true';
+}
+
 export function isConfigured() {
-  return Boolean(String(process.env.DELHIVERY_API_TOKEN || '').trim());
+  return isDemo() || Boolean(String(process.env.DELHIVERY_API_TOKEN || '').trim());
 }
 
 function authHeaders(extra = {}) {
@@ -40,6 +45,13 @@ function authFetch(url, options = {}) {
 // Returns { ok, waybill, labelUrl, raw } or { ok:false, error }.
 export async function createShipment(order, pickup = {}) {
   if (!isConfigured()) return { ok: false, error: 'Delhivery API token not configured' };
+
+  // DEMO MODE — simulated waybill, no Delhivery account needed.
+  // Waybill embeds its creation time so demo tracking can progress.
+  if (isDemo()) {
+    const waybill = 'DEMO' + Date.now().toString(36).toUpperCase() + String(Math.floor(Math.random() * 90) + 10);
+    return { ok: true, waybill, labelUrl: '', demo: true };
+  }
 
   const ship = order.shipping || {};
   const items = (order.items || []).map((it) => `${it.name} x${it.qty}`).join(', ');
@@ -109,6 +121,13 @@ export async function createShipment(order, pickup = {}) {
 export async function trackByAwb(awb) {
   const wbn = String(awb || '').trim();
   if (!wbn) return { ok: false, error: 'awb required' };
+
+  // DEMO MODE — simulated scan progression keyed to the waybill's
+  // booking time (30h from booking to delivery), so the same demo
+  // parcel advances Manifested → Picked Up → In Transit → Out for
+  // Delivery → Delivered in real time.
+  if (isDemo()) return demoTrack(wbn);
+
   if (!isConfigured()) return { ok: false, error: 'Delhivery API token not configured', configured: false };
 
   try {
@@ -141,6 +160,49 @@ export async function trackByAwb(awb) {
   } catch (err) {
     return { ok: false, error: err.message || 'Network error calling Delhivery' };
   }
+}
+
+// ── Demo tracker (DELHIVERY_DEMO=1) ──────────────────────────
+function demoTrack(wbn) {
+  const raw = String(wbn || '');
+  const created = raw.toUpperCase().startsWith('DEMO')
+    ? parseInt(raw.slice(4, -2), 36)
+    : NaN;
+  const t0 = Number.isFinite(created) && created > 1e12 ? created : Date.now();
+  const h = 3600 * 1000;
+  const stages = [
+    [0, 'Manifested', 'Shipment booked — awaiting pickup', 'Jaipur, Rajasthan'],
+    [0.5 * h, 'Picked Up', 'Shipment picked up by Delhivery executive', 'Jaipur, Rajasthan'],
+    [2 * h, 'In Transit', 'Departed origin hub', 'Jaipur Hub, Rajasthan'],
+    [8 * h, 'In Transit', 'Arrived at transit hub', 'Delhi Hub, Delhi'],
+    [20 * h, 'Out for Delivery', 'Out for delivery — delivery executive assigned', 'Destination City'],
+    [30 * h, 'Delivered', 'Shipment delivered successfully', 'Destination City'],
+  ];
+  const now = Date.now();
+  const scans = stages
+    .map(([off, status, detail, location]) => ({
+      status,
+      detail,
+      location,
+      time: new Date(t0 + off).toISOString(),
+    }))
+    .filter((s) => new Date(s.time).getTime() <= now);
+  if (!scans.length) {
+    scans.push({ status: 'Manifested', detail: 'Shipment booked — awaiting pickup', location: 'Jaipur, Rajasthan', time: new Date(t0).toISOString() });
+  }
+  scans.sort((a, b) => new Date(b.time) - new Date(a.time)); // newest first
+  const latest = scans[0];
+  return {
+    ok: true,
+    awb: raw,
+    status: latest.status,
+    storeStatus: mapToStoreStatus(latest.status),
+    ndr: false,
+    scans,
+    lastScan: latest,
+    expectedDelivery: new Date(t0 + 30 * h).toISOString(),
+    demo: true,
+  };
 }
 
 // ── Normalizers / mapping ────────────────────────────────────
