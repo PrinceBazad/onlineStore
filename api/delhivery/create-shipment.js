@@ -12,7 +12,23 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { order, pickup } = req.body || {};
+  // Safe body read — never let a malformed/BOM-prefixed body crash the fn.
+  const readBody = async () => {
+    try {
+      return req.body || {};
+    } catch {
+      /* fall through to raw stream */
+    }
+    try {
+      const chunks = [];
+      for await (const chunk of req) chunks.push(chunk);
+      return JSON.parse(Buffer.concat(chunks).toString('utf8').replace(/^\uFEFF/, '') || '{}');
+    } catch {
+      return {};
+    }
+  };
+
+  const { order, pickup } = await readBody();
   if (!order || !order.id) {
     return res.status(400).json({ error: 'order (with id) is required' });
   }

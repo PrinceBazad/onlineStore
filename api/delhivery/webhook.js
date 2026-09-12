@@ -42,7 +42,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    const body = req.body || {};
+    // Safe body read — never let a malformed/BOM-prefixed body crash the fn.
+    let body = {};
+    try {
+      body = req.body || {};
+    } catch {
+      const chunks = [];
+      for await (const chunk of req) chunks.push(chunk);
+      body = JSON.parse(Buffer.concat(chunks).toString('utf8').replace(/^\uFEFF/, '') || '{}');
+    }
     const { waybill, status } = parseEvent(body);
     console.log('[delhivery] webhook:', JSON.stringify({ waybill, status }));
 
