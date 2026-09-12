@@ -1205,3 +1205,6 @@ p { margin: 0 0 .8em; }
 }
 .flash-sale-settings label { display: block; margin-bottom: 10px; font-size: .9rem; }
 .check-row input { width: auto; height: auto; }
+/* ── Cart drawer stock hints ─────────────────────── */
+.di-stock-warn { color: #c0392b; font-size: .75rem; font-weight: 700; }
+.di-stock-low { color: #b06d16; font-size: .75rem; }

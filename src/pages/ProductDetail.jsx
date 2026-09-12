@@ -89,6 +89,11 @@ export default function ProductDetail() {
       setTimeout(() => setToast(''), 1800);
       return;
     }
+    if (user && typeof product.stock === 'number' && qty > product.stock) {
+      setToast(`Only ${product.stock} left in stock`);
+      setTimeout(() => setToast(''), 1800);
+      return;
+    }
     addItem(product, qty, size);
     setToast('✓ Added to cart' + (size ? ` (Size ${size})` : ''));
     setTimeout(() => setToast(''), 1800);

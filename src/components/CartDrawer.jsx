@@ -38,13 +38,21 @@ export default function CartDrawer({ open, onClose }) {
         ) : (
           <>
             <ul className="drawer-items">
-              {cart.map((c) => (
+              {cart.map((c) => {
+                const pc = products.find((x) => x.id === c.id);
+                const over = pc && typeof pc.stock === 'number' && c.qty > pc.stock;
+                const left = pc && typeof pc.stock === 'number' ? pc.stock : null;
+                return (
                 <li key={c.key} className="drawer-item">
                   <img src={c.image} alt={c.name} />
                   <div className="di-info">
                     <p className="di-name">
                       {c.name}{c.size ? ` · Size ${c.size}` : ''}
                     </p>
+                    {over && <p className="di-stock-warn">Only {left} left — reduce quantity</p>}
+                    {!over && left !== null && left <= 3 && c.qty <= left && (
+                      <p className="di-stock-low">Only {left} left in stock</p>
+                    )}
                     <div className="di-qty">
                       <button onClick={() => updateQty(c.key, c.qty - 1)}>−</button>
                       <span>{c.qty}</span>
@@ -58,7 +66,8 @@ export default function CartDrawer({ open, onClose }) {
                     </button>
                   </div>
                 </li>
-              ))}
+                );
+              })}
             </ul>
             <footer className="drawer-foot">
               <div className="subtotal">

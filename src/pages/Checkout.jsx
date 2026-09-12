@@ -140,6 +140,18 @@ export default function Checkout() {
     const v = validate();
     if (v) return setErr(v);
 
+    // Hard stock guard: block the order when any cart qty exceeds available stock.
+    const stockIssue = cart.find((c) => {
+      const p = products.find((x) => x.id === c.id);
+      return p && typeof p.stock === 'number' && c.qty > p.stock;
+    });
+    if (stockIssue) {
+      const left = products.find((x) => x.id === stockIssue.id)?.stock || 0;
+      return setErr(
+        `Only ${left} left in stock of "${stockIssue.name}" (you have ${stockIssue.qty} in the cart). Please reduce the quantity or remove it.`
+      );
+    }
+
     const baseOrder = {
       userId: user?.id || null,
       items: cart,
