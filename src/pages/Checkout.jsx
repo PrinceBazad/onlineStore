@@ -281,8 +281,8 @@ export default function Checkout() {
           <h2>Order summary</h2>
           <ul className="sum-items">
             {cart.map((c) => (
-              <li key={c.id}>
-                <span>{c.name} x {c.qty}</span>
+              <li key={c.key}>
+                <span>{c.name}{c.size ? ` (Size ${c.size})` : ''} x {c.qty}</span>
                 <span>{formatINR(c.price * c.qty)}</span>
               </li>
             ))}

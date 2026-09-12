@@ -39,19 +39,21 @@ export default function CartDrawer({ open, onClose }) {
           <>
             <ul className="drawer-items">
               {cart.map((c) => (
-                <li key={c.id} className="drawer-item">
+                <li key={c.key} className="drawer-item">
                   <img src={c.image} alt={c.name} />
                   <div className="di-info">
-                    <p className="di-name">{c.name}</p>
+                    <p className="di-name">
+                      {c.name}{c.size ? ` · Size ${c.size}` : ''}
+                    </p>
                     <div className="di-qty">
-                      <button onClick={() => updateQty(c.id, c.qty - 1)}>−</button>
+                      <button onClick={() => updateQty(c.key, c.qty - 1)}>−</button>
                       <span>{c.qty}</span>
-                      <button onClick={() => updateQty(c.id, c.qty + 1)}>+</button>
+                      <button onClick={() => updateQty(c.key, c.qty + 1)}>+</button>
                     </div>
                   </div>
                   <div className="di-right">
                     <p>{formatINR(c.price * c.qty)}</p>
-                    <button className="linklike" onClick={() => removeItem(c.id)}>
+                    <button className="linklike" onClick={() => removeItem(c.key)}>
                       Remove
                     </button>
                   </div>

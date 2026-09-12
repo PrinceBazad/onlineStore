@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 // Measurement charts per garment category + how-to-measure tips.
 // Category is matched loosely so "Daily Wear", "Suit", etc. all resolve.
@@ -54,18 +54,66 @@ const TIPS = [
   'Wear light clothing and don\u2019t pull the tape tight — it should sit snug, not squeeze.',
 ];
 
-export default function SizeGuide({ category, onClose }) {
+export default function SizeGuide({ category, onClose, editable = false, sizeValue = [], onSizesChange }) {
   const cat = String(category || '').toLowerCase();
   const chart = CHARTS.find((c) => c.match.some((m) => cat.includes(m))) || FALLBACK;
+  const [sizes, setSizes] = useState(Array.isArray(sizeValue) ? sizeValue : []);
+  const [sizeInput, setSizeInput] = useState('');
+
+  const addSize = () => {
+    const s = String(sizeInput || '').trim().toUpperCase();
+    if (!s) return;
+    if (!sizes.includes(s)) setSizes([...sizes, s]);
+    setSizeInput('');
+  };
+
+  const removeSize = (s) => setSizes(sizes.filter((x) => x !== s));
+
+  const done = () => {
+    if (editable && onSizesChange) onSizesChange(sizes);
+    onClose();
+  };
 
   return (
     <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Size guide">
       <div className="modal-card size-guide" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <h2>📏 {chart.title}</h2>
+          <h2>📏 {editable ? 'Edit sizes & size guide' : chart.title}</h2>
           <button type="button" className="modal-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
         <div style={{ padding: 16 }}>
+          {editable && (
+            <div className="size-editor">
+              <h3 style={{ margin: '0 0 6px' }}>Sizes available for this product</h3>
+              <div className="size-edit-chips">
+                {sizes.length === 0 ? (
+                  <span className="muted tiny">No sizes yet — add the first one below.</span>
+                ) : (
+                  sizes.map((s) => (
+                    <span key={s} className="chip size-chip">
+                      {s}
+                      <button type="button" className="chip-x" onClick={() => removeSize(s)} aria-label={`Remove ${s}`}>✕</button>
+                    </span>
+                  ))
+                )}
+              </div>
+              <div className="size-edit-row">
+                <input
+                  value={sizeInput}
+                  onChange={(e) => setSizeInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSize(); } }}
+                  placeholder="Enter a size (e.g. M)"
+                  aria-label="New size"
+                />
+                <button type="button" className="btn btn-sm btn-ghost" onClick={addSize} disabled={!sizeInput.trim()}>Add</button>
+              </div>
+              <p className="muted tiny">
+                These sizes appear on the product page and on the packing slip. Press <strong>Done</strong> to save.
+              </p>
+            </div>
+          )}
+
+          <h3 style={{ margin: '0 0 8px' }}>{chart.title}</h3>
           <p className="muted small" style={{ marginTop: 0 }}>{chart.note}</p>
           <div className="table-scroll">
             <table className="table size-table">
@@ -89,6 +137,12 @@ export default function SizeGuide({ category, onClose }) {
           <p className="muted tiny" style={{ marginBottom: 0 }}>
             All measurements are approximate — allow ±0.5" for stitching. Unsure? Message us on WhatsApp before ordering.
           </p>
+          {editable && (
+            <div className="row-gap" style={{ marginTop: 14 }}>
+              <button type="button" className="btn btn-gold" onClick={done}>✓ Done — save sizes</button>
+              <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
+            </div>
+          )}
         </div>
       </div>
     </div>

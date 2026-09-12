@@ -1118,6 +1118,82 @@ p { margin: 0 0 .8em; }
   transition: transform .1s;
 }
 .gift-code:hover { transform: translateY(-1px); }
+/* ── Product size picker ─────────────────────────── */
+.size-picker { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.size-label { font-size: .88rem; font-weight: 700; color: #555; }
+.size-opt {
+  min-width: 44px;
+  border: 1.5px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+.size-opt.active {
+  border-color: var(--gold, #9b1c3d);
+  background: rgba(155, 28, 61, 0.08);
+  color: #9b1c3d;
+}
+
+/* ── Share icon button (copies the link) ─────────── */
+.share-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  font-size: .86rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: #444;
+  transition: background .12s;
+}
+.share-icon-btn:hover { background: #fdf0f4; color: #9b1c3d; }
+
+/* ── Size editor (admin) ─────────────────────────── */
+.size-editor {
+  border: 1px dashed #c9a9b6;
+  background: #fff8f3;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+.size-edit-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 10px; }
+.size-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #fdf0f4;
+  border: 1px solid #9b1c3d;
+  color: #9b1c3d;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-weight: 700;
+}
+.chip-x {
+  border: none;
+  background: transparent;
+  color: #9b1c3d;
+  cursor: pointer;
+  font-size: .75rem;
+  line-height: 1;
+}
+.size-edit-row { display: flex; gap: 8px; align-items: center; }
+.size-edit-row input {
+  flex: 1;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+/* ── Products table: size column ─────────────────── */
+.products-size-col { max-width: 220px; }
+.products-size-col .muted.tiny { font-size: .72rem; }
 
 /* ── Admin: flash-sale settings ──────────────────── */
 .flash-sale-settings {

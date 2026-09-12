@@ -11,9 +11,10 @@ export function CartProvider({ children }) {
     db.saveCart(next);
   };
 
-  const addItem = (product, qty = 1) => {
+  const addItem = (product, qty = 1, size = '') => {
+    const key = `${product.id}::${String(size || '').toUpperCase()}`;
     let next;
-    const idx = cart.findIndex((c) => c.id === product.id);
+    const idx = cart.findIndex((c) => c.key === key);
     if (idx >= 0) {
       next = cart.map((c, i) =>
         i === idx ? { ...c, qty: c.qty + qty } : c
@@ -22,11 +23,13 @@ export function CartProvider({ children }) {
       next = [
         ...cart,
         {
+          key,
           id: product.id,
           name: product.name,
           price: product.price,
           image: product.image,
           color: product.color,
+          size: String(size || ''),
           qty,
         },
       ];
@@ -34,15 +37,15 @@ export function CartProvider({ children }) {
     persist(next);
   };
 
-  const updateQty = (id, qty) => {
+  const updateQty = (key, qty) => {
     if (qty <= 0) {
-      persist(cart.filter((c) => c.id !== id));
+      persist(cart.filter((c) => c.key !== key));
       return;
     }
-    persist(cart.map((c) => (c.id === id ? { ...c, qty } : c)));
+    persist(cart.map((c) => (c.key === key ? { ...c, qty } : c)));
   };
 
-  const removeItem = (id) => persist(cart.filter((c) => c.id !== id));
+  const removeItem = (key) => persist(cart.filter((c) => c.key !== key));
 
   const clearCart = () => persist([]);
 

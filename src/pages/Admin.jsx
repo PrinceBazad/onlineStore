@@ -6,6 +6,7 @@ import { formatINR, formatDateTime } from '../utils/format.js';
 import { invoicePdfUrl, downloadInvoicePdf, downloadPackingSlip } from '../utils/invoicePdf.js';
 import { productImage } from '../db.js';
 import OrdersQueue from '../components/OrdersQueue.jsx';
+import SizeGuide from '../components/SizeGuide.jsx';
 import { statusMeta } from '../orderFlow.js';
 
 const CATS = ['Suits', 'Ethnic', 'Lehenga', 'Saree', 'Daily Wear'];
@@ -28,6 +29,7 @@ const emptyForm = {
   paymentMethods: ['upi', 'card', 'cod'],
   returnsAccepted: true,
   returnDays: 7,
+  sizes: [],
   customImages: [],
 };
 
@@ -191,6 +193,7 @@ export default function Admin() {
   const [invoiceOrder, setInvoiceOrder] = useState(null);
   const [s, setS] = useState(settings);
   const [savedMsg, setSavedMsg] = useState('');
+  const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
   const [autoOpened, setAutoOpened] = useState(false);
   const [params] = useSearchParams();
   const orderParam = params.get('order');
@@ -316,6 +319,7 @@ export default function Admin() {
       ...form,
       price: Number(form.price),
       mrp: Number(form.mrp) || Math.round(Number(form.price) * 1.25 / 10) * 10,
+      sizes: (form.sizes || []).map((s) => String(s).trim().toUpperCase()).filter(Boolean),
       image: customImgs.length > 0 ? customImgs[0] : productImage(form.name.toUpperCase(), form.color),
       images: customImgs.length > 0 ? customImgs : [productImage(form.name.toUpperCase(), form.color)],
       shippingCost: Number(form.shippingCost) || 0,
@@ -349,6 +353,7 @@ export default function Admin() {
       paymentMethods: p.paymentMethods || ['upi', 'card', 'cod'],
       returnsAccepted: p.returnsAccepted ?? true,
       returnDays: p.returnDays ?? 7,
+      sizes: p.sizes || [],
       customImages: p.images || (p.image ? [p.image] : []),
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -520,6 +525,28 @@ export default function Admin() {
                     />
                   </label>
                 )}
+              </div>
+
+              {/* ── Sizes (opens the editable size guide) ─────────── */}
+              <div className="sizes-box">
+                <label style={{ display: 'block', marginBottom: 4 }}>Sizes for this product</label>
+                {form.sizes.length > 0 ? (
+                  <div className="size-edit-chips">
+                    {form.sizes.map((sz) => <span key={sz} className="chip size-chip">{sz}</span>)}
+                  </div>
+                ) : (
+                  <p className="muted tiny">No sizes set — the product will be sold free-size (no size picker).</p>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-sm btn-ghost"
+                  onClick={() => setSizeGuideOpen(true)}
+                >
+                  📏 Edit sizes &amp; size guide
+                </button>
+                <span className="muted tiny">
+                  Click to open the size guide — add/remove the sizes (S, M, L…) customers can choose.
+                </span>
               </div>
 
               <div className="row-gap">
@@ -785,6 +812,16 @@ export default function Admin() {
           order={invoiceOrder}
           settings={settings}
           onClose={() => setInvoiceOrder(null)}
+        />
+      )}
+
+      {sizeGuideOpen && (
+        <SizeGuide
+          editable
+          category={form.category}
+          sizeValue={form.sizes || []}
+          onSizesChange={(sizes) => setForm({ ...form, sizes })}
+          onClose={() => setSizeGuideOpen(false)}
         />
       )}
 

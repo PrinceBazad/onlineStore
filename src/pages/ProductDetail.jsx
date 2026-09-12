@@ -17,6 +17,7 @@ export default function ProductDetail() {
   const { isWishlisted, toggle } = useWishlist();
   const nav = useNavigate();
   const [qty, setQty] = useState(1);
+  const [size, setSize] = useState('');
   const [toast, setToast] = useState('');
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
@@ -49,9 +50,11 @@ export default function ProductDetail() {
     setActiveIndex((i) => (i + 1) % images.length);
   };
 
-  // Reset the gallery to the first image when opening a different product.
+  // Reset the gallery, qty and size when opening a different product.
   useEffect(() => {
     setActiveIndex(0);
+    setQty(1);
+    setSize('');
   }, [id]);
 
   if (!product) {
@@ -81,8 +84,13 @@ export default function ProductDetail() {
       nav('/login');
       return;
     }
-    addItem(product, qty);
-    setToast('✓ Added to cart');
+    if (product.sizes && product.sizes.length > 0 && !size) {
+      setToast('Please select a size first');
+      setTimeout(() => setToast(''), 1800);
+      return;
+    }
+    addItem(product, qty, size);
+    setToast('✓ Added to cart' + (size ? ` (Size ${size})` : ''));
     setTimeout(() => setToast(''), 1800);
   };
 
@@ -96,39 +104,19 @@ export default function ProductDetail() {
     setTimeout(() => setToast(''), 1800);
   };
 
-  // ── Share (WhatsApp / any app via native share sheet) ─────────
+  // ── Share: copy link so the user can paste it anywhere ──────
   const productUrl = () =>
     `${window.location.origin}${window.location.pathname}#/product/${product.id}`;
-  const shareText = () =>
-    `${product.name} — ${formatINR(product.price)} at ${settings.storeName}\n${productUrl()}`;
 
   const flash = (t) => {
     setToast(t);
     setTimeout(() => setToast(''), 1800);
   };
 
-  const shareWhatsApp = () => {
-    window.open(
-      `https://wa.me/?text=${encodeURIComponent(shareText())}`,
-      '_blank',
-      'noopener'
-    );
-  };
-
-  const shareNative = async () => {
-    // Native share sheet — covers Instagram, Facebook, SMS etc. on mobile.
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: product.name, text: shareText(), url: productUrl() });
-      } catch {
-        /* user dismissed the sheet */
-      }
-      return;
-    }
-    // Fallback: copy link
+  const copyShareLink = async () => {
     try {
-      await navigator.clipboard.writeText(shareText());
-      flash('✓ Product link copied — paste it in WhatsApp or Instagram DM');
+      await navigator.clipboard.writeText(productUrl());
+      flash('✓ Link copied — paste it in WhatsApp or Instagram to share');
     } catch {
       flash('Could not copy — long-press the address bar to copy the link');
     }
@@ -206,18 +194,44 @@ export default function ProductDetail() {
             </button>
           </div>
 
-          {/* ── Size guide + share ─────────────────────────── */}
+          {/* ── Size picker (only when admin set sizes) ────────── */}
+          {product.sizes && product.sizes.length > 0 && (
+            <div className="size-picker">
+              <span className="size-label">Size:</span>
+              {product.sizes.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={`size-opt${size === s ? ' active' : ''}`}
+                  onClick={() => setSize(s)}
+                  aria-pressed={size === s}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* ── Size guide + share (copy link) ──────────────────── */}
           <div className="buy-extras">
             <button type="button" className="linklike" onClick={() => setSizeGuideOpen(true)}>
               📏 Size guide
             </button>
             <span className="muted">·</span>
-            <button type="button" className="linklike" onClick={shareWhatsApp}>
-              Share on WhatsApp
-            </button>
-            <span className="muted">·</span>
-            <button type="button" className="linklike" onClick={shareNative}>
-              More options…
+            <button
+              type="button"
+              className="share-icon-btn"
+              onClick={copyShareLink}
+              title="Copy product link"
+              aria-label="Copy product link to share"
+            >
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="8.6" />
+                <circle cx="9.2" cy="10.5" r="2.1" />
+                <circle cx="14.6" cy="10.5" r="2.1" />
+                <path d="M10.2 14.6a3.5 3.5 0 0 13.6 1.6 2.4h-2.4v2" />
+              </svg>
+              Share
             </button>
           </div>
 
