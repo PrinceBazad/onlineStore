@@ -3,7 +3,7 @@ import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useData } from '../context/DataContext.jsx';
 import { formatINR, formatDateTime } from '../utils/format.js';
-import { FLOW, payMeta } from '../orderFlow.js';
+import { FLOW, payMeta, roleQueueScope } from '../orderFlow.js';
 
 // Step 3 of the portal plan: the live staff dashboard.
 // Real-time counters (via the existing Firestore-backed DataContext)
@@ -16,6 +16,7 @@ export default function StaffDashboard() {
   if (!isStaff) return <Navigate to="/" replace />;
 
   const list = orders || [];
+  const scope = roleQueueScope(user?.role);
   const byStatus = {};
   list.forEach((o) => { byStatus[o.status] = (byStatus[o.status] || 0) + 1; });
   const unpaid = list.filter((o) => !payMeta(o).paid).length;
@@ -26,6 +27,15 @@ export default function StaffDashboard() {
     .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
 
   const cards = [
+    // Role-scoped hero cards: packers see "to pack", shippers "to ship".
+    ...(scope
+      ? [{
+          key: 'mine',
+          num: list.filter((o) => scope.statuses.includes(o.status)).length,
+          lbl: scope.title,
+          hero: true,
+        }]
+      : []),
     ...FLOW.map((s) => ({ key: s.status, num: byStatus[s.status] || 0, lbl: s.label })),
     { key: 'cancelled', num: byStatus.cancelled || 0, lbl: 'Cancelled' },
     { key: 'returned', num: byStatus.returned || 0, lbl: 'Returned' },
@@ -33,7 +43,8 @@ export default function StaffDashboard() {
     { key: 'today', num: todayOrders, lbl: 'Orders today' },
   ];
 
-  const recent = [...list]
+  // Role-scoped recent list: packers see confirmed orders, shippers packed ones.
+  const recent = (scope ? list.filter((o) => scope.statuses.includes(o.status)) : list)
     .sort((a, b) => String(b.orderDate || '').localeCompare(String(a.orderDate || '')))
     .slice(0, 8);
 
@@ -49,7 +60,7 @@ export default function StaffDashboard() {
 
       <div className="dash-grid">
         {cards.map((c) => (
-          <div key={c.key} className={`stat-card${c.warn ? ' warn' : ''}`}>
+          <div key={c.key} className={`stat-card${c.warn ? ' warn' : ''}${c.hero ? ' hero' : ''}`}>
             <div className="num">{c.num}</div>
             <div className="lbl">{c.lbl}</div>
           </div>
@@ -57,9 +68,11 @@ export default function StaffDashboard() {
       </div>
 
       <section className="card-box">
-        <h2>Recent orders</h2>
+        <h2>{scope ? scope.title : 'Recent orders'}</h2>
         {recent.length === 0 ? (
-          <p className="muted">No orders yet. New orders will appear here in real time.</p>
+          <p className="muted">
+            {scope ? scope.empty : 'No orders yet. New orders will appear here in real time.'}
+          </p>
         ) : (
           <div className="orders-list">
             {recent.map((o) => {

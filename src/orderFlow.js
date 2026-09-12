@@ -93,6 +93,29 @@ export function nextStatuses(current, role) {
   return (TRANSITIONS[from] || []).filter((t) => canTransition(from, t, role));
 }
 
+// ── Role-scoped queues ──────────────────────────────────────
+// Packers only see orders waiting to be packed; shippers only see
+// orders waiting to be shipped. Admin/manager/support see everything.
+// Legacy "paid" orders count as confirmed (waiting to be packed).
+export function roleQueueScope(role) {
+  const r = String(role || '').toLowerCase();
+  if (r === 'packer') {
+    return {
+      statuses: ['confirmed', 'paid'],
+      title: 'Orders to pack',
+      empty: 'No orders waiting to be packed. Newly confirmed orders appear here automatically.',
+    };
+  }
+  if (r === 'shipper') {
+    return {
+      statuses: ['packed'],
+      title: 'Orders to ship',
+      empty: 'No orders waiting to be shipped. Packed orders appear here automatically.',
+    };
+  }
+  return null;
+}
+
 // ── Payment badge helpers ───────────────────────────────────
 export function payMeta(order) {
   const o = order || {};

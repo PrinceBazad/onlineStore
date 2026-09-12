@@ -1022,3 +1022,6 @@ p { margin: 0 0 .8em; }
 .stat-card .num { font-size: 1.7rem; font-weight: 800; line-height: 1.1; }
 .stat-card .lbl { color: #777; font-size: .82rem; margin-top: 4px; }
 .stat-card.warn .num { color: #b06d16; }
+.stat-card.hero { background: var(--gold, #9b1c3d); border-color: var(--gold, #9b1c3d); }
+.stat-card.hero .num { color: #fff; font-size: 2.2rem; }
+.stat-card.hero .lbl { color: rgba(255, 255, 255, 0.85); font-size: .9rem; font-weight: 700; }

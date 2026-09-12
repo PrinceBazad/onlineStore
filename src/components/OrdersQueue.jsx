@@ -1,20 +1,27 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatINR, formatDateTime } from '../utils/format.js';
-import { FLOW, statusMeta, payMeta, nextStatuses, REQUIRED_FIELDS } from '../orderFlow.js';
+import { FLOW, statusMeta, payMeta, nextStatuses, REQUIRED_FIELDS, roleQueueScope } from '../orderFlow.js';
 
 /**
  * Staff orders queue with role-aware workflow guards, payment badges,
  * quick filtering and an inline tracking form for shipments.
  * `onUpdate(order, status, opts)` is supplied by the parent (DataContext).
+ *
+ * Role scoping: packers see ONLY orders waiting to be packed (confirmed),
+ * shippers ONLY orders waiting to be shipped (packed). Admin/manager/support
+ * get the full board with filter chips.
  */
 export default function OrdersQueue({ orders, role, user, onUpdate, onInvoice, onPackSlip, initialFilter = 'all' }) {
+  const scope = roleQueueScope(role);
   const [filter, setFilter] = useState(initialFilter && initialFilter !== 'all' ? initialFilter : 'all');
   const [q, setQ] = useState('');
   const [shippingId, setShippingId] = useState(null);
   const [tf, setTf] = useState({ courier: '', trackingNo: '' });
 
-  const list = [...(orders || [])].sort((a, b) => String(b.orderDate || '').localeCompare(String(a.orderDate || '')));
+  const all = [...(orders || [])].sort((a, b) => String(b.orderDate || '').localeCompare(String(a.orderDate || '')));
+  // Locked scope for packer/shipper — they only ever see their own queue.
+  const list = scope ? all.filter((o) => scope.statuses.includes(o.status)) : all;
   const counts = { all: list.length };
   list.forEach((o) => { counts[o.status] = (counts[o.status] || 0) + 1; });
   counts.unpaid = list.filter((o) => !payMeta(o).paid).length;
@@ -70,18 +77,24 @@ export default function OrdersQueue({ orders, role, user, onUpdate, onInvoice, o
 
   return (
     <div>
-      <div className="filter-chips">
-        {chips.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            className={`chip ${filter === c.id ? 'active' : ''}${c.warn ? ' danger' : ''}`}
-            onClick={() => setFilter(c.id)}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
+      {scope ? (
+        <p className="muted" style={{ marginTop: 4 }}>
+          <strong>{scope.title} ({filtered.length})</strong> — you only see the orders waiting for your step.
+        </p>
+      ) : (
+        <div className="filter-chips">
+          {chips.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className={`chip ${filter === c.id ? 'active' : ''}${c.warn ? ' danger' : ''}`}
+              onClick={() => setFilter(c.id)}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <input
         className="queue-search"
@@ -92,7 +105,7 @@ export default function OrdersQueue({ orders, role, user, onUpdate, onInvoice, o
       />
 
       {filtered.length === 0 ? (
-        <p className="muted">No orders match this filter.</p>
+        <p className="muted">{scope ? scope.empty : 'No orders match this filter.'}</p>
       ) : (
         <div className="orders-list">
           {filtered.map((o) => {
