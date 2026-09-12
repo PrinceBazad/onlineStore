@@ -14,7 +14,7 @@ const ALL_PAY_METHODS = [
 
 export default function Checkout() {
   const { cart, subtotal, clearCart } = useCart();
-  const { placeOrder, settings, products } = useData();
+  const { placeOrder, settings, products, validateCoupon } = useData();
   const { user } = useAuth();
   const nav = useNavigate();
 
@@ -32,13 +32,49 @@ export default function Checkout() {
   const [placed, setPlaced] = useState(null);
   const [err, setErr] = useState('');
   const [gatewayNotice, setGatewayNotice] = useState('');
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null); // coupon CODE string
+  const [couponMsg, setCouponMsg] = useState('');
 
   const shippingFee = cart.reduce((sum, c) => {
     const p = products.find((x) => x.id === c.id);
     const perUnit = p && typeof p.shippingCost === 'number' ? p.shippingCost : 99;
     return sum + perUnit * c.qty;
   }, 0);
-  const total = subtotal + shippingFee;
+  // Discount is re-derived on every render so it stays correct if the
+  // cart changes after a coupon is applied.
+  const couponRes = appliedCoupon ? validateCoupon(appliedCoupon, subtotal) : null;
+  const discount = couponRes?.ok ? couponRes.discount : 0;
+  const total = Math.max(0, subtotal + shippingFee - discount);
+
+  // If the coupon stops qualifying (e.g. qty dropped below min order), drop it.
+  React.useEffect(() => {
+    if (appliedCoupon && couponRes && !couponRes.ok) {
+      setAppliedCoupon(null);
+      setCouponMsg(couponRes.error + ' Coupon removed.');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appliedCoupon, subtotal]);
+
+  const applyCoupon = () => {
+    setCouponMsg('');
+    const code = couponInput.trim();
+    if (!code) return;
+    const res = validateCoupon(code, subtotal);
+    if (!res.ok) {
+      setAppliedCoupon(null);
+      setCouponMsg(res.error);
+      return;
+    }
+    setAppliedCoupon(res.coupon.code);
+    setCouponMsg(`✓ ${res.coupon.code} applied — you saved ${formatINR(res.discount)}!`);
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput('');
+    setCouponMsg('');
+  };
 
   const availableMethods = ALL_PAY_METHODS.filter((m) =>
     cart.every((c) => {
@@ -109,7 +145,10 @@ export default function Checkout() {
       items: cart,
       customer: { name: shipping.name, phone: shipping.phone, email: shipping.email },
       shipping: { address: shipping.address, city: shipping.city, state: shipping.state, pincode: shipping.pincode },
-      subtotal, shippingFee, total,
+      subtotal, shippingFee,
+      discount,
+      couponCode: appliedCoupon?.code || null,
+      total,
     };
 
     if (activeMethod === 'cod') {
@@ -251,8 +290,37 @@ export default function Checkout() {
           <div className="sum-lines">
             <div><span>Subtotal</span><span>{formatINR(subtotal)}</span></div>
             <div><span>Shipping</span><span>{shippingFee === 0 ? 'FREE' : formatINR(shippingFee)}</span></div>
+            {discount > 0 && (
+              <div className="discount-line">
+                <span>Coupon ({appliedCoupon.code})</span>
+                <span>− {formatINR(discount)}</span>
+              </div>
+            )}
             <div className="total"><span>Total</span><span>{formatINR(total)}</span></div>
           </div>
+
+          <div className="coupon-box">
+            {appliedCoupon ? (
+              <div className="coupon-applied">
+                <span>🎟️ <strong>{appliedCoupon.code}</strong> — saved {formatINR(appliedCoupon.discount)}</span>
+                <button type="button" className="linklike" onClick={removeCoupon}>Remove</button>
+              </div>
+            ) : (
+              <div className="coupon-row">
+                <input
+                  value={couponInput}
+                  onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                  placeholder="Coupon code"
+                  aria-label="Coupon code"
+                />
+                <button type="button" className="btn btn-sm btn-ghost" onClick={applyCoupon} disabled={!couponInput.trim()}>
+                  Apply
+                </button>
+              </div>
+            )}
+            {couponMsg && <p className={`tiny ${couponMsg.startsWith('✓') ? 'ok' : 'error'}`}>{couponMsg}</p>}
+          </div>
+
           {err && <p className="error">{err}</p>}
           <button form="checkout-form" className="btn btn-gold btn-block" type="submit" disabled={paying || !activeMethod}>
             {paying ? 'Processing...' : activeMethod === 'cod' ? 'Place order - COD' : 'Pay & place order'}

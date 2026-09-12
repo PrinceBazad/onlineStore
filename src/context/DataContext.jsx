@@ -10,6 +10,7 @@ export function DataProvider({ children }) {
   const [settings, setSettings] = useState(db.getSettings());
   const [reviews, setReviews] = useState(db.getReviews());
   const [messages, setMessages] = useState(db.getMessages());
+  const [coupons, setCoupons] = useState(db.getCoupons());
 
   const updateSettings = (patch) => {
     const next = { ...settings, ...patch };
@@ -26,6 +27,7 @@ export function DataProvider({ children }) {
       else if (e.key === 'houselaxmicloth_orders') setOrders(db.getOrders());
       else if (e.key === 'houselaxmicloth_reviews') setReviews(db.getReviews());
       else if (e.key === 'houselaxmicloth_messages') setMessages(db.getMessages());
+      else if (e.key === 'houselaxmicloth_coupons') setCoupons(db.getCoupons());
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
@@ -38,6 +40,7 @@ export function DataProvider({ children }) {
     const unsubSettings = listenFromFirestore('houselaxmicloth_settings', setSettings);
     const unsubReviews = listenFromFirestore('houselaxmicloth_reviews', setReviews);
     const unsubMessages = listenFromFirestore('houselaxmicloth_messages', setMessages);
+    const unsubCoupons = listenFromFirestore('houselaxmicloth_coupons', setCoupons);
 
     return () => {
       unsubProducts();
@@ -45,6 +48,7 @@ export function DataProvider({ children }) {
       unsubSettings();
       unsubReviews();
       unsubMessages();
+      unsubCoupons();
     };
   }, []);
 
@@ -132,6 +136,65 @@ export function DataProvider({ children }) {
     db.saveProducts(next);
   };
 
+  // ----- coupon helpers -----
+  const saveCoupons = (next) => {
+    setCoupons(next);
+    db.saveCoupons(next);
+  };
+
+  const addCoupon = ({ code, type, value, minOrder }) => {
+    const c = {
+      id: db.uid('CPN-'),
+      code: String(code || '').trim().toUpperCase(),
+      type: type === 'percent' ? 'percent' : 'flat',
+      value: Math.max(0, Number(value) || 0),
+      minOrder: Math.max(0, Number(minOrder) || 0),
+      active: true,
+      usedCount: 0,
+      createdAt: new Date().toISOString(),
+    };
+    if (!c.code) return null;
+    saveCoupons([c, ...coupons]);
+    return c;
+  };
+
+  const deleteCoupon = (id) => {
+    saveCoupons(coupons.filter((c) => c.id !== id));
+  };
+
+  const toggleCoupon = (id) => {
+    saveCoupons(coupons.map((c) => (c.id === id ? { ...c, active: !c.active } : c)));
+  };
+
+  // Validate a coupon code against a cart subtotal.
+  // Returns { ok, coupon, discount, error }.
+  const validateCoupon = (code, subtotal) => {
+    const c = coupons.find(
+      (x) => x.code === String(code || '').trim().toUpperCase()
+    );
+    if (!c) return { ok: false, error: 'Invalid coupon code.' };
+    if (!c.active) return { ok: false, error: 'This coupon is no longer active.' };
+    if (subtotal < (c.minOrder || 0)) {
+      return { ok: false, error: `Minimum order ₹${c.minOrder} required for this coupon.` };
+    }
+    const discount =
+      c.type === 'percent'
+        ? Math.round((subtotal * Math.min(c.value, 100)) / 100)
+        : Math.min(c.value, subtotal);
+    if (discount <= 0) return { ok: false, error: 'Coupon gives no discount on this cart.' };
+    return { ok: true, coupon: c, discount };
+  };
+
+  const markCouponUsed = (code) => {
+    const norm = String(code || '').trim().toUpperCase();
+    if (!norm) return;
+    saveCoupons(
+      coupons.map((c) =>
+        c.code === norm ? { ...c, usedCount: (c.usedCount || 0) + 1 } : c
+      )
+    );
+  };
+
   // ----- order helpers -----
   const placeOrder = (payload) => {
     const order = {
@@ -147,6 +210,8 @@ export function DataProvider({ children }) {
       payment: payload.payment,
       subtotal: payload.subtotal,
       shippingFee: payload.shippingFee,
+      discount: Number(payload.discount) || 0,
+      couponCode: payload.couponCode || null,
       total: payload.total,
       status: payload.payment.method === 'cod' ? 'confirmed' : 'paid',
       statusHistory: [
@@ -160,6 +225,7 @@ export function DataProvider({ children }) {
     const next = [order, ...orders];
     setOrders(next);
     db.saveOrders(next);
+    if (order.couponCode) markCouponUsed(order.couponCode);
     // Order confirmation e-mail (fire-and-forget; skips when no mail API configured).
     postApi('/api/send-order-mail', {
       type: 'confirmed',
@@ -169,6 +235,10 @@ export function DataProvider({ children }) {
         customerEmail: order.customerEmail || order.customer?.email,
         customerName: order.customer?.name,
         total: order.total,
+        subtotal: order.subtotal,
+        shippingFee: order.shippingFee,
+        discount: order.discount || 0,
+        couponCode: order.couponCode || '',
         paymentMode: order.payment?.mode,
         orderDate: order.orderDate,
         storeName: settings.storeName,
@@ -353,8 +423,13 @@ export function DataProvider({ children }) {
       messages,
       addMessage,
       updateMessageStatus,
+      coupons,
+      addCoupon,
+      deleteCoupon,
+      toggleCoupon,
+      validateCoupon,
     }),
-    [products, orders, settings, reviews, messages]
+    [products, orders, settings, reviews, messages, coupons]
   );
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

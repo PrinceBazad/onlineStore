@@ -14,13 +14,16 @@ export function invoiceLines(order, settings) {
   const s = settings || {};
   const items = (order?.items || []).map((it) => ({
     name: it.name,
+    size: it.size || it.variant || "",
     qty: it.qty || 1,
     price: Number(it.price || 0),
     total: Number(it.price || 0) * (it.qty || 1),
   }));
   const subtotal = items.reduce((a, b) => a + b.total, 0);
   const shipping = Number(order?.shippingFee ?? 0);
-  const total = Number(order?.total ?? subtotal + shipping);
+  const discount = Number(order?.discount ?? 0);
+  const couponCode = order?.couponCode || "";
+  const total = Number(order?.total ?? subtotal + shipping - discount);
   return {
     brand: s.storeName || "Houselaxmicloth",
     tagline: s.tagline || "Ethnic fashion store",
@@ -36,6 +39,8 @@ export function invoiceLines(order, settings) {
     items,
     subtotal,
     shipping,
+    discount,
+    couponCode,
     total,
   };
 }
@@ -213,7 +218,15 @@ export async function buildInvoicePdf(order, settings) {
   y += 5.6;
   doc.text(M, y, "Shipping");
   doc.text(W - M, y, L.shipping > 0 ? MONEY(L.shipping) : "FREE", { align: "right" });
-  y += 6.6;
+  y += 5.6;
+  if (L.discount > 0) {
+    doc.setTextColor(20, 120, 90);
+    doc.text(M, y, "Coupon" + (L.couponCode ? " (" + L.couponCode + ")" : ""));
+    doc.text(W - M, y, "-" + MONEY(L.discount), { align: "right" });
+    doc.setTextColor(inkR, inkG, inkB);
+    y += 5.6;
+  }
+  y += 1;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
   doc.setTextColor(brandR, brandG, brandB);
@@ -334,15 +347,25 @@ async function buildPackingSlip(order, settings) {
   doc.setTextColor(255, 255, 255);
   doc.rect(M, y, CW, 7, "F");
   doc.text(M + 2, y + 4.6, "ITEM");
-  doc.text(M + 150, y + 4.6, "QTY", { align: "right" });
+  doc.text(M + 108, y + 4.6, "SIZE");
+  doc.text(M + 138, y + 4.6, "QTY", { align: "right" });
+  doc.text(M + 158, y + 4.6, "PACKED", { align: "right" });
   y += 7;
   doc.setFont("helvetica", "normal");
   doc.setTextColor(inkR, inkG, inkB);
+  const drawBox = (bx, by) => {
+    doc.setDrawColor(inkR, inkG, inkB);
+    doc.setLineWidth(0.3);
+    doc.rect(bx, by, 3.6, 3.6);
+    doc.setDrawColor(220, 214, 219);
+    doc.setLineWidth(0.2);
+  };
   let n = 0;
   for (const it of L.items) {
     n += 1;
-    const nameLines = wraps(doc, it.name, 120, 9);
-    const rowH = Math.max(7, nameLines.length * 4.2 + 2);
+    const nameLines = wraps(doc, it.name, 100, 9);
+    const sizeText = it.size ? String(it.size) : "—";
+    const rowH = Math.max(8, nameLines.length * 4.2 + 3);
     if (y + rowH > H - 46) {
       doc.addPage();
       y = M + 6;
@@ -355,7 +378,9 @@ async function buildPackingSlip(order, settings) {
     if (nameLines.length > 1) {
       for (let li = 1; li < nameLines.length; li++) doc.text(M + 8, y + 4.6 + li * 4.2, nameLines[li]);
     }
-    doc.text(M + 150, y + 4.6, String(it.qty), { align: "right" });
+    doc.text(M + 108, y + 4.6, sizeText);
+    doc.text(M + 138, y + 4.6, String(it.qty), { align: "right" });
+    drawBox(M + 148, y + 2.4);
     y += rowH;
   }
   doc.line(M, y, W - M, y);
@@ -367,11 +392,25 @@ async function buildPackingSlip(order, settings) {
   doc.setTextColor(brandR, brandG, brandB);
   doc.text(M, y, "Total items: " + L.items.length + "   ·   Total qty: " + totalQty);
   y += 8;
+
+  // ── Packer checklist: one tick per piece, then final seals ──
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(inkR, inkG, inkB);
-  doc.text(M, y, "☐  All items above are packed in the order");
+  doc.text(M, y, "Packer checklist — tick each piece as it goes in:");
   y += 6;
+  for (const it of L.items) {
+    const sizeText = it.size ? ` (Size ${it.size})` : "";
+    const label = `☐  ${it.name}${sizeText} × ${it.qty}`;
+    const labelLines = wraps(doc, label, CW - 6, 9);
+    if (y + labelLines.length * 4.2 > H - 40) {
+      doc.addPage();
+      y = M + 6;
+    }
+    labelLines.forEach((ln, li) => doc.text(M + 2, y + li * 4.2, ln));
+    y += labelLines.length * 4.2 + 1.4;
+  }
+  y += 2;
   doc.text(M, y, "☐  Invoice slip included in the package");
   y += 6;
   doc.text(M, y, "☐  Package sealed and dispatched");

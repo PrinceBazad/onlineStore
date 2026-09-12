@@ -7,10 +7,11 @@ import { useWishlist } from '../context/WishlistContext.jsx';
 import { formatINR, formatDate } from '../utils/format.js';
 import Stars from '../components/Stars.jsx';
 import ProductCard from '../components/ProductCard.jsx';
+import SizeGuide from '../components/SizeGuide.jsx';
 
 export default function ProductDetail() {
   const { id } = useParams();
-  const { products, reviewsFor, ratingFor, addReview } = useData();
+  const { products, reviewsFor, ratingFor, addReview, settings } = useData();
   const { addItem, cart } = useCart();
   const { user } = useAuth();
   const { isWishlisted, toggle } = useWishlist();
@@ -23,6 +24,8 @@ export default function ProductDetail() {
 
   // Currently selected gallery image index (moves with the arrows).
   const [activeIndex, setActiveIndex] = useState(0);
+  const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
+  const [shareMsg, setShareMsg] = useState('');
 
   const product = products.find((p) => p.id === id);
 
@@ -91,6 +94,44 @@ export default function ProductDetail() {
     toggle(product.id);
     setToast(saved ? '✓ Removed from wishlist' : '♥ Added to wishlist');
     setTimeout(() => setToast(''), 1800);
+  };
+
+  // ── Share (WhatsApp / any app via native share sheet) ─────────
+  const productUrl = () =>
+    `${window.location.origin}${window.location.pathname}#/product/${product.id}`;
+  const shareText = () =>
+    `${product.name} — ${formatINR(product.price)} at ${settings.storeName}\n${productUrl()}`;
+
+  const flash = (t) => {
+    setToast(t);
+    setTimeout(() => setToast(''), 1800);
+  };
+
+  const shareWhatsApp = () => {
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(shareText())}`,
+      '_blank',
+      'noopener'
+    );
+  };
+
+  const shareNative = async () => {
+    // Native share sheet — covers Instagram, Facebook, SMS etc. on mobile.
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: product.name, text: shareText(), url: productUrl() });
+      } catch {
+        /* user dismissed the sheet */
+      }
+      return;
+    }
+    // Fallback: copy link
+    try {
+      await navigator.clipboard.writeText(shareText());
+      flash('✓ Product link copied — paste it in WhatsApp or Instagram DM');
+    } catch {
+      flash('Could not copy — long-press the address bar to copy the link');
+    }
   };
 
   const onReview = (e) => {
@@ -162,6 +203,21 @@ export default function ProductDetail() {
             </button>
             <button className={`btn btn-wish ${saved ? 'active' : ''}`} onClick={onWish}>
               {saved ? '♥ Saved' : '♡ Save'}
+            </button>
+          </div>
+
+          {/* ── Size guide + share ─────────────────────────── */}
+          <div className="buy-extras">
+            <button type="button" className="linklike" onClick={() => setSizeGuideOpen(true)}>
+              📏 Size guide
+            </button>
+            <span className="muted">·</span>
+            <button type="button" className="linklike" onClick={shareWhatsApp}>
+              Share on WhatsApp
+            </button>
+            <span className="muted">·</span>
+            <button type="button" className="linklike" onClick={shareNative}>
+              More options…
             </button>
           </div>
 
@@ -253,6 +309,10 @@ export default function ProductDetail() {
             {related.map((p) => <ProductCard key={p.id} product={p} />)}
           </div>
         </section>
+      )}
+
+      {sizeGuideOpen && (
+        <SizeGuide category={product.category} onClose={() => setSizeGuideOpen(false)} />
       )}
     </main>
   );

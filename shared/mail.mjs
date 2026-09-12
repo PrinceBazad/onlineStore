@@ -56,6 +56,38 @@ export function renderOrderMail(type, orderRaw) {
     },
   };
 
+  // Special-day wish (birthday / anniversary gift code) â€” its own layout.
+  if (type === 'specialday') {
+    const giftCode = esc(o.code || 'GIFT');
+    const specialType = esc(o.specialType || 'Birthday');
+    const subject = `ğŸŽ‰ Happy ${specialType}! A gift inside from ${STORE_NAME}`;
+    const html = `<!doctype html>
+<html>
+<body style="font-family:Arial,Helvetica,sans-serif;background:#faf6f0;padding:24px;max-width:600px;margin:0 auto">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:14px;border:1px solid #eadfd6;overflow:hidden">
+    <tr>
+      <td style="padding:22px 28px;background:#9b1c3d;color:#fff">
+        <div style="font-size:20px;font-weight:700">${esc(STORE_NAME)}</div>
+        <div style="font-size:13px;opacity:.85">Ethnic fashion store</div>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:26px 28px;text-align:center">
+        <div style="font-size:44px;line-height:1">ğŸŽ‚ğŸŽ</div>
+        <h1 style="font-size:21px;margin:10px 0 12px">Happy ${specialType}${name === 'there' ? '' : `, ${name}`}!</h1>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 18px">On your special day, we have a little gift for you â€” a discount code to celebrate in style.</p>
+        <div style="display:inline-block;background:#fdf0f4;border:2px dashed #9b1c3d;color:#9b1c3d;font-size:24px;font-weight:800;letter-spacing:3px;padding:12px 28px;border-radius:12px">${giftCode}</div>
+        <p style="font-size:13px;color:#7c6f72;margin:14px 0 20px">Enter this code at checkout. Valid during your special month.</p>
+        <a href="${APP_ORIGIN}/#/catalog" style="display:inline-block;background:#9b1c3d;color:#fff;text-decoration:none;padding:11px 22px;border-radius:30px;font-size:14px">Shop with your gift â†’</a>
+        <p style="font-size:12px;color:#7c6f72;margin:22px 0 0">This is a system-generated email. No reply is monitored.</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+    return { subject, html };
+  }
+
   const c = COPY[type] || COPY.confirmed;
   const html = `<!doctype html>
 <html>

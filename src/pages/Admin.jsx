@@ -80,6 +80,58 @@ function InvoicePreviewModal({ order, settings, onClose }) {
 
 const STAFF_ROLE_CHOICES = ['packer', 'shipper', 'support', 'manager', 'admin', 'customer'];
 
+function CouponForm({ addCoupon }) {
+  const [code, setCode] = useState('');
+  const [type, setType] = useState('percent');
+  const [value, setValue] = useState('');
+  const [minOrder, setMinOrder] = useState('');
+  const [msg, setMsg] = useState('');
+
+  const submit = (e) => {
+    e.preventDefault();
+    const v = Number(value);
+    if (!code.trim()) return setMsg('Enter a coupon code.');
+    if (!v || v <= 0) return setMsg('Enter a discount value.');
+    if (type === 'percent' && v > 100) return setMsg('Percent discount cannot exceed 100.');
+    addCoupon({ code, type, value: v, minOrder: Number(minOrder) || 0 });
+    setMsg(`Coupon "${code.trim().toUpperCase()}" created — it is live at checkout right away.`);
+    setCode(''); setValue(''); setMinOrder('');
+    setTimeout(() => setMsg(''), 3500);
+  };
+
+  return (
+    <form onSubmit={submit} className="form">
+      <div className="grid2">
+        <label>
+          Coupon code
+          <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="e.g. FESTIVE10" maxLength={20} />
+        </label>
+        <label>
+          Discount type
+          <select value={type} onChange={(e) => setType(e.target.value)}>
+            <option value="percent">Percent (%) off subtotal</option>
+            <option value="flat">Flat (₹) off subtotal</option>
+          </select>
+        </label>
+      </div>
+      <div className="grid2">
+        <label>
+          {type === 'percent' ? 'Percent off (e.g. 10)' : 'Amount off in ₹ (e.g. 200)'}
+          <input type="number" min="1" value={value} onChange={(e) => setValue(e.target.value)} placeholder={type === 'percent' ? '10' : '200'} />
+        </label>
+        <label>
+          Minimum order ₹ (optional)
+          <input type="number" min="0" value={minOrder} onChange={(e) => setMinOrder(e.target.value)} placeholder="e.g. 1499" />
+        </label>
+      </div>
+      <div className="row-gap">
+        <button className="btn btn-gold" type="submit">Create coupon</button>
+      </div>
+      {msg && <p className="ok">{msg}</p>}
+    </form>
+  );
+}
+
 function StaffRoleForm({ setUserRole }) {
   const [uid, setUid] = useState('');
   const [role, setRole] = useState('packer');
@@ -131,7 +183,7 @@ function StaffRoleForm({ setUserRole }) {
 
 export default function Admin() {
   const { user, isAdmin, isStaff, setUserRole } = useAuth();
-  const { products, orders, settings, updateSettings, addProduct, updateProduct, deleteProduct, updateOrderStatus } = useData();
+  const { products, orders, settings, updateSettings, addProduct, updateProduct, deleteProduct, updateOrderStatus, coupons, addCoupon, deleteCoupon, toggleCoupon } = useData();
   const [tab, setTab] = useState(isAdmin ? 'products' : 'orders');
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
@@ -330,6 +382,11 @@ export default function Admin() {
         {isAdmin && (
           <button className={tab === 'settings' ? 'chip active' : 'chip'} onClick={() => setTab('settings')}>
             Settings
+          </button>
+        )}
+        {isAdmin && (
+          <button className={tab === 'coupons' ? 'chip active' : 'chip'} onClick={() => setTab('coupons')}>
+            Coupons {coupons.length ? `(${coupons.length})` : ''}
           </button>
         )}
         {isAdmin && (
@@ -536,6 +593,55 @@ export default function Admin() {
         </section>
       )}
 
+      {tab === 'coupons' && (
+        <>
+          <section className="card-box">
+            <h2>Create a coupon</h2>
+            <p className="muted small">
+              Customers can enter the code at checkout. Percent coupons take a % off the subtotal;
+              flat coupons take a fixed ₹ amount off. Minimum order (optional) must be met before the coupon applies.
+            </p>
+            <CouponForm addCoupon={addCoupon} />
+          </section>
+
+          <section className="card-box">
+            <h2>All coupons</h2>
+            {coupons.length === 0 ? (
+              <p className="muted">No coupons yet. Create your first one above.</p>
+            ) : (
+              <div className="table-scroll">
+                <table className="table">
+                  <thead>
+                    <tr><th>Code</th><th>Discount</th><th>Min order</th><th>Used</th><th>Status</th><th>Actions</th></tr>
+                  </thead>
+                  <tbody>
+                    {coupons.map((c) => (
+                      <tr key={c.id}>
+                        <td><strong>{c.code}</strong></td>
+                        <td>{c.type === 'percent' ? `${c.value}% off` : `${formatINR(c.value)} off`}</td>
+                        <td>{c.minOrder ? formatINR(c.minOrder) : '—'}</td>
+                        <td>{c.usedCount || 0}</td>
+                        <td>
+                          <span className={`status-badge ${c.active ? 'confirmed' : 'cancelled'}`}>
+                            {c.active ? 'Active' : 'Paused'}
+                          </span>
+                        </td>
+                        <td className="row-gap">
+                          <button className="btn btn-sm" onClick={() => toggleCoupon(c.id)}>
+                            {c.active ? 'Pause' : 'Activate'}
+                          </button>
+                          <button className="btn btn-sm danger" onClick={() => deleteCoupon(c.id)}>Delete</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </>
+      )}
+
     {tab === 'settings' && (
         <section className="card-box">
           <h2>Store settings</h2>
@@ -607,6 +713,44 @@ export default function Admin() {
               <input type="number" min="0" value={s.freeShippingThreshold || 0} onChange={setSField('freeShippingThreshold')} placeholder="1499" />
               <span className="muted tiny">Orders at or above this amount get free shipping. Per-product shipping fees still apply below this threshold.</span>
             </label>
+
+            <div className="flash-sale-settings">
+              <h3 style={{ margin: '6px 0 10px' }}>🔥 Flash sale banner</h3>
+              <label className="check-row" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  type="checkbox"
+                  checked={!!(s.flashSale && s.flashSale.active)}
+                  onChange={(e) =>
+                    setS({
+                      ...s,
+                      flashSale: {
+                        ...(s.flashSale || {}),
+                        active: e.target.checked,
+                        message: (s.flashSale && s.flashSale.message) || '',
+                        endsAt: (s.flashSale && s.flashSale.endsAt) || '',
+                      },
+                    })
+                  }
+                />
+                <span>Show flash-sale banner on every page (with live countdown)</span>
+              </label>
+              <label>Banner message
+                <input
+                  value={(s.flashSale && s.flashSale.message) || ''}
+                  onChange={(e) => setS({ ...s, flashSale: { ...(s.flashSale || {}), active: !!(s.flashSale && s.flashSale.active), message: e.target.value, endsAt: (s.flashSale && s.flashSale.endsAt) || '' } })}
+                  placeholder="e.g. TEEJ SALE — flat 20% off everything!"
+                  maxLength={120}
+                />
+              </label>
+              <label>Sale ends at
+                <input
+                  type="datetime-local"
+                  value={(s.flashSale && s.flashSale.endsAt) || ''}
+                  onChange={(e) => setS({ ...s, flashSale: { ...(s.flashSale || {}), active: !!(s.flashSale && s.flashSale.active), message: (s.flashSale && s.flashSale.message) || '', endsAt: e.target.value } })}
+                />
+                <span className="muted tiny">The banner disappears automatically the moment this time passes — on every visitor's screen. Save settings to apply.</span>
+              </label>
+            </div>
             <div className="pay-mode-row">
               <label style={{ display: 'block', marginBottom: 4 }}>Payment mode</label>
               <div className="pay-mode-options">

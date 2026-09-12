@@ -12,6 +12,8 @@ export default function Profile() {
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [address, setAddress] = useState(user?.address || '');
+  const [specialDate, setSpecialDate] = useState(user?.specialDate || '');
+  const [specialDateType, setSpecialDateType] = useState(user?.specialDateType || 'Birthday');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
 
@@ -46,7 +48,13 @@ export default function Profile() {
     }
     setSaving(true);
     try {
-      await updateUserProfile({ name: name.trim(), phone: phone.trim(), address: address.trim() });
+      await updateUserProfile({
+        name: name.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+        specialDate: specialDate || '',
+        specialDateType: specialDateType || 'Birthday',
+      });
       flash('Profile updated.');
     } catch (ex) {
       flash(ex.message);
@@ -100,6 +108,18 @@ export default function Profile() {
           <label>Address
             <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={3} placeholder='Street, city, postcode...' disabled={profileLocked} title={profileLocked ? 'Locked while an order is processing' : undefined} />
           </label>
+          <div className="grid2">
+            <label>Birthday / Anniversary (optional)
+              <input type="date" value={specialDate} onChange={(e) => setSpecialDate(e.target.value)} max="2100-12-31" />
+              <span className="muted tiny">We'll mail you a birthday gift coupon every year.</span>
+            </label>
+            <label>It is a…
+              <select value={specialDateType} onChange={(e) => setSpecialDateType(e.target.value)}>
+                <option value="Birthday">Birthday</option>
+                <option value="Anniversary">Anniversary</option>
+              </select>
+            </label>
+          </div>
           {msg && <p className='ok'>{msg}</p>}
           <div className='flex-row-m'>
             <button type='submit' className='btn btn-gold' disabled={profileLocked} title={profileLocked ? 'Locked while an order is processing' : undefined}>Save changes</button>

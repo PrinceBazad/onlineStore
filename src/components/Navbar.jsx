@@ -6,6 +6,7 @@ import { useWishlist } from '../context/WishlistContext.jsx';
 import { useData } from '../context/DataContext.jsx';
 import Logo from './Logo.jsx';
 import AccountIcon from './AccountIcon.jsx';
+import FlashBanner from './FlashBanner.jsx';
 
 const links = [
   { to: '/', label: 'Home' },
@@ -30,6 +31,8 @@ export default function Navbar({ onCartOpen }) {
       <div className="topstrip">
         <span>{settings.announcement}</span>
       </div>
+
+      <FlashBanner flashSale={settings.flashSale} />
 
       <nav className="nav-inner">
                 <Link to="/" className="brand" onClick={closeMenu}>

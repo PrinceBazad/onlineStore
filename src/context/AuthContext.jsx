@@ -28,6 +28,8 @@ export function AuthProvider({ children }) {
           phone: userData.phone || '',
           address: userData.address || '',
           role: userData.role || 'customer',
+          specialDate: userData.specialDate || '',
+          specialDateType: userData.specialDateType || 'Birthday',
         };
         setUser(session);
         db.saveSession(session);
@@ -41,7 +43,7 @@ export function AuthProvider({ children }) {
     return () => unsubscribe();
   }, []);
 
-  const signup = async ({ name, email, password, phone }) => {
+  const signup = async ({ name, email, password, phone, specialDate, specialDateType }) => {
     try {
       // Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -53,6 +55,8 @@ export function AuthProvider({ children }) {
         email: email.toLowerCase(),
         phone: phone || '',
         role: 'customer',
+        specialDate: specialDate || '',
+        specialDateType: specialDateType || 'Birthday',
         createdAt: new Date().toISOString(),
       };
       await setDoc(doc(firestore, 'users', firebaseUser.uid), userData);
@@ -64,6 +68,8 @@ export function AuthProvider({ children }) {
         phone: phone || '',
         address: '',
         role: 'customer',
+        specialDate: specialDate || '',
+        specialDateType: specialDateType || 'Birthday',
       };
       db.saveSession(session);
       setUser(session);
@@ -96,6 +102,8 @@ export function AuthProvider({ children }) {
         phone: userData.phone || '',
         address: userData.address || '',
         role: userData.role || 'customer',
+        specialDate: userData.specialDate || '',
+        specialDateType: userData.specialDateType || 'Birthday',
       };
       db.saveSession(session);
       setUser(session);
