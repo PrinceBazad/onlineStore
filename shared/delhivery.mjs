@@ -12,7 +12,11 @@
 // { configured: false } and the UI falls back to manual AWB entry.
 // ─────────────────────────────────────────────────────────────
 
-const BASE = 'https://track.delhivery.com';
+// Production: https://track.delhivery.com
+// Sandbox/demo (when Delhivery issues a staging token): usually
+// https://staging.track.delhivery.com — set DELHIVERY_API_BASE to it
+// while testing, and remove it when going live.
+const BASE = String(process.env.DELHIVERY_API_BASE || 'https://track.delhivery.com').replace(/\/+$/, '');
 
 export function isConfigured() {
   return Boolean(String(process.env.DELHIVERY_API_TOKEN || '').trim());
