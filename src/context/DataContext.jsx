@@ -199,6 +199,26 @@ export function DataProvider({ children }) {
   };
 
   // ----- order helpers -----
+  // Adjust product stock by delta per item quantity (clamped at 0).
+  // Called with -1 when an order is placed and +1 when it is cancelled,
+  // so the shelf always matches reality. No-op when the product was deleted.
+  const adjustStock = (items, delta) => {
+    let next = products;
+    (items || []).forEach((it) => {
+      if (!it || !it.id) return;
+      const q = Math.max(0, Number(it.qty) || 1);
+      next = next.map((p) =>
+        p.id === it.id
+          ? { ...p, stock: Math.max(0, Number(p.stock || 0) + delta * q) }
+          : p
+      );
+    });
+    if (next !== products) {
+      setProducts(next);
+      db.saveProducts(next);
+    }
+  };
+
   const placeOrder = (payload) => {
     const order = {
       id: db.uid('ORD-'),
@@ -228,6 +248,8 @@ export function DataProvider({ children }) {
     const next = [order, ...orders];
     setOrders(next);
     db.saveOrders(next);
+    // Auto-decrement product stock by the ordered quantities.
+    adjustStock(order.items, -1);
     if (order.couponCode) markCouponUsed(order.couponCode);
     // Order confirmation e-mail (fire-and-forget; skips when no mail API configured).
     postApi('/api/send-order-mail', {
@@ -276,6 +298,9 @@ export function DataProvider({ children }) {
   };
 
   const cancelOrder = (orderId, refundInfo) => {
+    // Put the ordered pieces back on the shelf.
+    const target = orders.find((o) => o.id === orderId);
+    if (target) adjustStock(target.items, +1);
     const next = orders.map((o) =>
       o.id === orderId
         ? {
@@ -327,6 +352,10 @@ export function DataProvider({ children }) {
     db.saveOrders(next);
 
     if (changed) {
+      // Restock the pieces when an order is cancelled (only on the first transition).
+      if (status === 'cancelled' && prevStatus !== 'cancelled') {
+        adjustStock(changed.items, +1);
+      }
       // Server-side audit + status e-mail (fire-and-forget; safe when the API is missing).
       postApi('/api/update-order-status', {
         orderId: id,
