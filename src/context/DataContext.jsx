@@ -293,6 +293,26 @@ export function DataProvider({ children }) {
     db.saveOrders(next);
   };
 
+  // Merge Delhivery courier data (scans/status/label) into an order
+  // WITHOUT touching statusHistory — used by the tracking auto-sync.
+  const mergeDelhivery = (orderId, delhiveryPatch) => {
+    const at = new Date().toISOString();
+    const next = orders.map((o) => {
+      if (o.id !== orderId) return o;
+      return {
+        ...o,
+        courier: o.courier || 'Delhivery',
+        delhivery: {
+          ...(o.delhivery || {}),
+          ...delhiveryPatch,
+          lastSyncedAt: delhiveryPatch.lastSyncedAt || at,
+        },
+      };
+    });
+    setOrders(next);
+    db.saveOrders(next);
+  };
+
   // Best-effort calls to the Vercel API functions. Never blocks the store.
   const postApi = async (path, body) => {
     try {
@@ -324,6 +344,7 @@ export function DataProvider({ children }) {
       placeOrder,
       updateOrderStatus,
       addOrderNote,
+      mergeDelhivery,
       findOrder,
       canCancel,
       cancelOrder,

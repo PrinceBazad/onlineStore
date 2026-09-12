@@ -1,19 +1,22 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useData } from '../context/DataContext.jsx';
 import { formatINR, formatDateTime } from '../utils/format.js';
 import { invoicePdfUrl, downloadInvoicePdf, packingSlipUrl, downloadPackingSlip } from '../utils/invoicePdf.js';
 import { FLOW, statusMeta, payMeta, nextStatuses, flowStepIndex, ROLE_LABELS, REQUIRED_FIELDS } from '../orderFlow.js';
+import { bookDelhiveryShipment, fetchDelhiveryTrack, isDelhiveryOrder, scansStale } from '../utils/delhivery.js';
 
 export default function OrderManage() {
   const { user, isStaff } = useAuth();
-  const { orders, updateOrderStatus, addOrderNote, settings } = useData();
+  const { orders, updateOrderStatus, addOrderNote, mergeDelhivery, settings } = useData();
   const { id } = useParams();
   const [invoiceOrder, setInvoiceOrder] = useState(null);
   const [slipOrder, setSlipOrder] = useState(null);
-  const [tracking, setTracking] = useState({ courier: '', trackingNo: '', open: false });
+  const [tracking, setTracking] = useState({ courier: '', trackingNo: '', open: false, labelUrl: '' });
   const [noteText, setNoteText] = useState('');
+  const [dhlBusy, setDhlBusy] = useState(false);
+  const [dhlMsg, setDhlMsg] = useState('');
 
   // Scoped page: only THIS order is ever shown.
   const order = orders.find((o) => o.id.toLowerCase() === String(id || '').toLowerCase());
@@ -46,6 +49,79 @@ export default function OrderManage() {
     if (!noteText.trim()) return;
     addOrderNote(order.id, noteText, { uid: user.id, name: user.name || user.email, role: user.role });
     setNoteText('');
+  };
+
+  // ── Delhivery helpers ──────────────────────────────────────
+  // Auto-refresh courier scans when a shipped order is opened
+  // (only for Delhivery shipments and only when data is stale).
+  useEffect(() => {
+    if (!order || !isStaff) return undefined;
+    if (order.status !== 'shipped' || !order.trackingNo) return undefined;
+    if (!isDelhiveryOrder(order) || !scansStale(order)) return undefined;
+    let cancelled = false;
+    (async () => {
+      const t = await fetchDelhiveryTrack(order.trackingNo);
+      if (cancelled || !t.ok) return;
+      mergeDelhivery(order.id, {
+        awb: t.awb || order.trackingNo,
+        status: t.status,
+        scans: t.scans || [],
+        ndr: Boolean(t.ndr),
+        expectedDelivery: t.expectedDelivery || null,
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.id, order?.status, order?.delhivery?.lastSyncedAt, isStaff]);
+
+  // Create the waybill via the Delhivery API and pre-fill the ship form.
+  const bookPickup = async () => {
+    if (dhlBusy) return;
+    setDhlBusy(true);
+    setDhlMsg('Booking pickup with Delhivery…');
+    const r = await bookDelhiveryShipment(order);
+    setDhlBusy(false);
+    if (!r.ok) {
+      setDhlMsg(r.error || 'Booking failed.');
+      return;
+    }
+    setDhlMsg(`Waybill ${r.waybill} created. Confirm "Ship" below.`);
+    mergeDelhivery(order.id, { awb: r.waybill, labelUrl: r.labelUrl || '' });
+    setTracking({ courier: 'Delhivery', trackingNo: r.waybill, open: true, labelUrl: r.labelUrl || '' });
+    if (r.labelUrl) window.open(r.labelUrl, '_blank', 'noopener');
+  };
+
+  // Pull live scans and offer to apply Delhivery's terminal statuses.
+  const syncTracking = async () => {
+    if (!order?.trackingNo || dhlBusy) return;
+    setDhlBusy(true);
+    setDhlMsg('Fetching courier updates…');
+    const t = await fetchDelhiveryTrack(order.trackingNo);
+    if (!t.ok) {
+      setDhlMsg(t.error || 'Tracking unavailable.');
+      setDhlBusy(false);
+      return;
+    }
+    mergeDelhivery(order.id, {
+      awb: t.awb || order.trackingNo,
+      status: t.status,
+      scans: t.scans || [],
+      ndr: Boolean(t.ndr),
+      expectedDelivery: t.expectedDelivery || null,
+    });
+    setDhlMsg(`Courier status: ${t.status}`);
+    if ((t.storeStatus === 'delivered' || t.storeStatus === 'returned') && t.storeStatus !== order.status) {
+      const label = t.storeStatus === 'delivered' ? 'Delivered' : 'Returned';
+      if (window.confirm(`Delhivery reports this parcel as "${t.status}". Mark the order ${label.toLowerCase()}?`)) {
+        updateOrderStatus(order.id, t.storeStatus, label, {
+          note: `Auto-synced from Delhivery: ${t.status}`,
+          by: { uid: user.id, name: user.name || user.email, role: user.role },
+        });
+      }
+    }
+    setDhlBusy(false);
   };
 
   return (
@@ -88,7 +164,58 @@ export default function OrderManage() {
           {order.trackingNo && (
             <p className="muted" style={{ marginTop: 8 }}>
               📦 {order.courier || 'Courier'} · <strong>{order.trackingNo}</strong>
+              {order.delhivery?.expectedDelivery ? ` · ETA ${formatDateTime(order.delhivery.expectedDelivery)}` : ''}
+              {isStaff && (
+                <>
+                  {' '}
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-ghost"
+                    onClick={syncTracking}
+                    disabled={dhlBusy}
+                    title="Refresh live courier status"
+                  >
+                    {dhlBusy ? 'Syncing…' : '⟳ Sync'}
+                  </button>
+                </>
+              )}
             </p>
+          )}
+
+          {dhlMsg && <p className="muted small" style={{ marginTop: 4 }}>{dhlMsg}</p>}
+
+          {isStaff && order.delhivery?.labelUrl && (
+            <p style={{ marginTop: 4 }}>
+              <a href={order.delhivery.labelUrl} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-ghost">
+                🖨 Download shipping label
+              </a>
+            </p>
+          )}
+
+          {isStaff && order.delhivery?.ndr && (
+            <p className="error" style={{ marginTop: 6 }}>
+              ⚠️ Delivery attempt failed (NDR). Contact the customer or mark the order returned.
+            </p>
+          )}
+
+          {order.delhivery?.scans?.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <h3 className="muted" style={{ fontSize: '1rem', marginBottom: 6 }}>Courier tracking</h3>
+              <p className="muted tiny" style={{ marginBottom: 4 }}>
+                Current: <strong>{order.delhivery.status || '—'}</strong>
+                {order.delhivery.lastSyncedAt ? ` · synced ${formatDateTime(order.delhivery.lastSyncedAt)}` : ''}
+              </p>
+              <ul className="audit-list">
+                {order.delhivery.scans.map((sc, i) => (
+                  <li key={i}>
+                    <strong>{sc.status}</strong>
+                    {sc.location ? ` · ${sc.location}` : ''}
+                    {sc.detail ? ` — ${sc.detail}` : ''}
+                    {sc.time ? <span className="muted"> · {formatDateTime(sc.time)}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {isStaff && (
@@ -120,6 +247,17 @@ export default function OrderManage() {
                   )
                 )
               )}
+              {order.status === 'packed' && (
+                <button
+                  type="button"
+                  className="chip"
+                  onClick={bookPickup}
+                  disabled={dhlBusy}
+                  title="Create the waybill via the Delhivery API (before the token is added, book in the Delhivery panel and enter the AWB manually)"
+                >
+                  🚚 Book Delhivery pickup
+                </button>
+              )}
             </div>
           )}
 
@@ -147,6 +285,11 @@ export default function OrderManage() {
               >
                 ✓ Ship
               </button>
+              {tracking.labelUrl && (
+                <a href={tracking.labelUrl} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-ghost">
+                  🖨 Label
+                </a>
+              )}
               <button type="button" className="btn btn-sm btn-ghost" onClick={() => setTracking({ ...tracking, open: false })}>
                 Cancel
               </button>

@@ -4,6 +4,7 @@ import { useData } from '../context/DataContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
 import { formatINR, formatDateTime } from '../utils/format.js';
+import { fetchDelhiveryTrack, isDelhiveryOrder } from '../utils/delhivery.js';
 
 
 const ORD_TIMELINE = [
@@ -24,6 +25,35 @@ export default function OrderStatus() {
   const [notFound, setNotFound] = useState(false);
   const [err, setErr] = useState('');
   const [cancelling, setCancelling] = useState(false);
+  const [courierTrack, setCourierTrack] = useState(null);
+  const [courierBusy, setCourierBusy] = useState(false);
+
+  // Live courier tracking for shipped/delivered Delhivery parcels.
+  const loadCourierTrack = async () => {
+    const awb = order?.trackingNo;
+    if (!awb) return;
+    setCourierBusy(true);
+    const t = await fetchDelhiveryTrack(awb);
+    setCourierTrack(t.ok ? t : t.configured === false ? { notConfigured: true } : { error: t.error });
+    setCourierBusy(false);
+  };
+
+  useEffect(() => {
+    setCourierTrack(null);
+    if (!order || !order.trackingNo) return undefined;
+    if (!isDelhiveryOrder(order)) return undefined;
+    if (!(order.status === 'shipped' || order.status === 'delivered')) return undefined;
+    let cancelled = false;
+    (async () => {
+      const t = await fetchDelhiveryTrack(order.trackingNo);
+      if (cancelled) return;
+      setCourierTrack(t.ok ? t : t.configured === false ? { notConfigured: true } : { error: t.error });
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.id, order?.status]);
 
   useEffect(() => {
     const q = params.get('order');
@@ -157,6 +187,59 @@ export default function OrderStatus() {
               );
             })}
           </div>
+
+          {order.status === 'shipped' || order.status === 'delivered' ? (
+            <div className="card-box inner" style={{ marginTop: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <h3 style={{ margin: 0 }}>Courier tracking</h3>
+                {order.trackingNo && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-ghost"
+                    onClick={loadCourierTrack}
+                    disabled={courierBusy}
+                  >
+                    {courierBusy ? 'Checking…' : '⟳ Refresh'}
+                  </button>
+                )}
+              </div>
+              {order.trackingNo ? (
+                <p className="muted" style={{ margin: '6px 0' }}>
+                  📦 {order.courier || 'Courier'} · <strong>{order.trackingNo}</strong>
+                  {order.delhivery?.expectedDelivery ? ` · Expected by ${formatDateTime(order.delhivery.expectedDelivery)}` : ''}
+                </p>
+              ) : (
+                <p className="muted" style={{ margin: '6px 0' }}>
+                  A courier tracking number will appear here once your parcel is handed over to the courier.
+                </p>
+              )}
+              {courierTrack?.notConfigured && (
+                <p className="muted small">
+                  Live courier updates are coming soon. Meanwhile, your order status above is kept up to date by our team.
+                </p>
+              )}
+              {courierTrack?.error && !courierTrack?.notConfigured && (
+                <p className="muted small">Could not load live courier updates right now. Please refresh later.</p>
+              )}
+              {courierTrack?.ok && (
+                <>
+                  <p className="small" style={{ margin: '6px 0' }}>
+                    Current: <strong>{courierTrack.status}</strong>
+                  </p>
+                  <ul className="audit-list">
+                    {courierTrack.scans.map((sc, i) => (
+                      <li key={i}>
+                        <strong>{sc.status}</strong>
+                        {sc.location ? ` · ${sc.location}` : ''}
+                        {sc.detail ? ` — ${sc.detail}` : ''}
+                        {sc.time ? <span className="muted"> · {formatDateTime(sc.time)}</span> : null}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          ) : null}
 
           <div className="track-meta">
             <div className="card-box inner">
