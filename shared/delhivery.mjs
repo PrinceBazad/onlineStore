@@ -19,8 +19,8 @@
 const BASE = String(process.env.DELHIVERY_API_BASE || 'https://track.delhivery.com').replace(/\/+$/, '');
 
 export function isDemo() {
-  const d = String(process.env.DELHIVERY_DEMO || '').toLowerCase();
-  return d === '1' || d === 'true';
+  const d = String(process.env.DELHIVERY_DEMO || '').trim().toLowerCase();
+  return d === '1' || d === 'true' || d === 'yes';
 }
 
 export function isConfigured() {
