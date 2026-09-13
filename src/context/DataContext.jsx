@@ -344,7 +344,7 @@ export function DataProvider({ children }) {
     if (order.couponCode) markCouponUsed(order.couponCode);
     // Order confirmation e-mail (fire-and-forget; skips when no mail API configured).
     postApi('/api/send-order-mail', {
-      type: 'confirmed',
+      type: 'placed',
       to: order.customerEmail || order.customer?.email,
       order: {
         id: order.id,

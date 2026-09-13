@@ -19,7 +19,15 @@ const TRANSITIONS = {
   returned: [],
 };
 
-const MAIL_TYPES = { shipped: 'shipped', delivered: 'delivered', cancelled: 'cancelled' };
+const MAIL_TYPES = {
+  placed: 'placed',
+  confirmed: 'confirmed',
+  packed: 'packed',
+  shipped: 'shipped',
+  delivered: 'delivered',
+  cancelled: 'cancelled',
+  returned: 'returned',
+};
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
