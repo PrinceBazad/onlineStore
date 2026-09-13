@@ -20,6 +20,7 @@ import Signup from './pages/Signup.jsx';
 import OrderStatus from './pages/OrderStatus.jsx';
 import OrderManage from './pages/OrderManage.jsx';
 import MyOrders from './pages/MyOrders.jsx';
+import Returns from './pages/Returns.jsx';
 import Wishlist from './pages/Wishlist.jsx';
 import Admin from './pages/Admin.jsx';
 import StaffDashboard from './pages/StaffDashboard.jsx';
@@ -57,6 +58,7 @@ export default function App() {
               <Route path="/track" element={<OrderStatus />} />
               <Route path="/order-manage/:id" element={<OrderManage />} />
               <Route path="/orders" element={<MyOrders />} />
+              <Route path="/returns" element={<Returns />} />
               <Route path="/wishlist" element={<Wishlist />} />
                             <Route path="/admin" element={<Admin />} />
               <Route path="/dashboard" element={<StaffDashboard />} />

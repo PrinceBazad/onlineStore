@@ -36,6 +36,24 @@ export async function bookDelhiveryShipment(order) {
   }
 }
 
+/**
+ * Book a Delhivery REVERSE pickup for a customer return.
+ * Returns { ok, configured, waybill, error }.
+ */
+export async function bookReversePickup(ret) {
+  try {
+    const res = await fetch('/api/delhivery/create-reverse-pickup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ret }),
+    });
+    const data = await res.json();
+    return { ...data, http: res.status };
+  } catch {
+    return { ok: false, configured: true, error: 'Network error while booking the pickup' };
+  }
+}
+
 /** True when the order was shipped through Delhivery. */
 export function isDelhiveryOrder(order) {
   const o = order || {};

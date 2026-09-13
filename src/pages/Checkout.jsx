@@ -14,7 +14,7 @@ const ALL_PAY_METHODS = [
 
 export default function Checkout() {
   const { cart, subtotal, clearCart } = useCart();
-  const { placeOrder, settings, products, validateCoupon } = useData();
+  const { placeOrder, settings, products, validateCoupon, logPayment } = useData();
   const { user } = useAuth();
   const nav = useNavigate();
 
@@ -35,6 +35,7 @@ export default function Checkout() {
   const [couponInput, setCouponInput] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null); // coupon CODE string
   const [couponMsg, setCouponMsg] = useState('');
+  const [submitting, setSubmitting] = useState(false); // double-submit lock
 
   const shippingFee = cart.reduce((sum, c) => {
     const p = products.find((x) => x.id === c.id);
@@ -75,6 +76,28 @@ export default function Checkout() {
     setCouponInput('');
     setCouponMsg('');
   };
+
+  // ── Pincode serviceability + delivery-date promise ──────────
+  const pinCode = String(shipping.pincode || '').trim();
+  const pinInfo = /^\d{6}$/.test(pinCode)
+    ? (() => {
+        const pins = Array.isArray(settings.serviceablePincodes)
+          ? settings.serviceablePincodes
+          : [];
+        if (pins.length === 0 || pins.includes(pinCode)) {
+          const minD = Math.max(1, Number(settings.deliveryMinDays) || 4);
+          const maxD = Math.max(minD, Number(settings.deliveryMaxDays) || 7);
+          const fmt = (d) =>
+            new Date(Date.now() + d * 86400000).toLocaleDateString('en-IN', {
+              weekday: 'short',
+              day: 'numeric',
+              month: 'short',
+            });
+          return { state: 'ok', label: `Expected delivery ${fmt(minD)} – ${fmt(maxD)}` };
+        }
+        return { state: 'no', label: `We don't deliver to pincode ${pinCode} yet` };
+      })()
+    : { state: 'empty' };
 
   const availableMethods = ALL_PAY_METHODS.filter((m) =>
     cart.every((c) => {
@@ -130,13 +153,17 @@ export default function Checkout() {
       if (!shipping[k].trim()) return 'Please fill all shipping details.';
     }
     if (!/^\d{6}$/.test(shipping.pincode)) return 'Enter a valid 6-digit pincode.';
+    if (pinInfo.state === 'no') return `We don't deliver to pincode ${pinCode} yet. Please check another pincode.`;
     return '';
   };
 
   const submit = async (e) => {
     e.preventDefault();
+    if (submitting) return; // double-click / replay guard
+    setSubmitting(true);
     setErr('');
     setGatewayNotice('');
+    try {
     const v = validate();
     if (v) return setErr(v);
 
@@ -152,7 +179,10 @@ export default function Checkout() {
       );
     }
 
+    const clientToken =
+      Date.now().toString(36) + Math.random().toString(36).slice(2, 12).toUpperCase();
     const baseOrder = {
+      clientToken,
       userId: user?.id || null,
       items: cart,
       customer: { name: shipping.name, phone: shipping.phone, email: shipping.email },
@@ -166,6 +196,7 @@ export default function Checkout() {
     if (activeMethod === 'cod') {
       const payment = { method: 'cod', status: 'pending', mode: 'Cash on Delivery' };
       const order = placeOrder({ ...baseOrder, payment });
+      logPayment({ orderId: order.id, method: 'cod', gateway: '', mode: 'COD', status: 'pending', amount: total, verified: null, ref: '' });
       clearCart();
       setPlaced(order);
       return;
@@ -181,6 +212,7 @@ export default function Checkout() {
         ref: 'DEMO-' + Date.now().toString(36).toUpperCase(),
       };
       const order = placeOrder({ ...baseOrder, payment });
+      logPayment({ orderId: order.id, method: 'online', gateway: 'Demo', mode: activeMethod === 'upi' ? 'UPI' : 'Card', status: 'paid', verified: false, ref: payment.ref });
       clearCart();
       setPlaced(order);
     };
@@ -227,6 +259,17 @@ export default function Checkout() {
         ref: response.razorpay_payment_id,
       };
       const order = placeOrder({ ...baseOrder, payment });
+      logPayment({
+        orderId: order.id,
+        method: 'online',
+        gateway: 'Razorpay',
+        mode: activeMethod === 'upi' ? 'UPI' : 'Card',
+        status: 'paid',
+        verified: Boolean(response && response._verified),
+        ref: response?.razorpay_payment_id || '',
+        rzOrderId: response?.razorpay_order_id || '',
+        signaturePresent: Boolean(response && response.razorpay_signature),
+      });
       clearCart();
       setPlaced(order);
     } catch (ex) {
@@ -239,6 +282,9 @@ export default function Checkout() {
       }
     } finally {
       setPaying(false);
+    }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -256,7 +302,10 @@ export default function Checkout() {
           <div className="grid3">
             <label>City<input value={shipping.city} onChange={setShip('city')} /></label>
             <label>State<input value={shipping.state} onChange={setShip('state')} /></label>
-            <label>Pincode<input value={shipping.pincode} onChange={setShip('pincode')} maxLength={6} /></label>
+            <label>Pincode<input value={shipping.pincode} onChange={setShip('pincode')} maxLength={6} />
+              {pinInfo.state === 'ok' && <span className="pin-msg ok">✓ {pinInfo.label}</span>}
+              {pinInfo.state === 'no' && <span className="pin-msg error">✕ {pinInfo.label}</span>}
+            </label>
           </div>
         </section>
 
@@ -310,6 +359,12 @@ export default function Checkout() {
             )}
             <div className="total"><span>Total</span><span>{formatINR(total)}</span></div>
           </div>
+          {pinInfo.state === 'ok' && (
+            <p className="pin-promise">🚚 {pinInfo.label}</p>
+          )}
+          {pinInfo.state === 'no' && (
+            <p className="error tiny">{pinInfo.label}</p>
+          )}
 
           <div className="coupon-box">
             {appliedCoupon ? (
@@ -334,8 +389,8 @@ export default function Checkout() {
           </div>
 
           {err && <p className="error">{err}</p>}
-          <button form="checkout-form" className="btn btn-gold btn-block" type="submit" disabled={paying || !activeMethod}>
-            {paying ? 'Processing...' : activeMethod === 'cod' ? 'Place order - COD' : 'Pay & place order'}
+          <button form="checkout-form" className="btn btn-gold btn-block" type="submit" disabled={paying || submitting || !activeMethod}>
+            {paying ? 'Processing...' : submitting ? 'Placing order...' : activeMethod === 'cod' ? 'Place order - COD' : 'Pay & place order'}
           </button>
         </div>
       </aside>

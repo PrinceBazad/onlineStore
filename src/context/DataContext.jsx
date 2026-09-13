@@ -11,6 +11,8 @@ export function DataProvider({ children }) {
   const [reviews, setReviews] = useState(db.getReviews());
   const [messages, setMessages] = useState(db.getMessages());
   const [coupons, setCoupons] = useState(db.getCoupons());
+  const [payments, setPayments] = useState(db.getPayments());
+  const [returns, setReturns] = useState(db.getReturns());
 
   const updateSettings = (patch) => {
     const next = { ...settings, ...patch };
@@ -28,6 +30,8 @@ export function DataProvider({ children }) {
       else if (e.key === 'houselaxmicloth_reviews') setReviews(db.getReviews());
       else if (e.key === 'houselaxmicloth_messages') setMessages(db.getMessages());
       else if (e.key === 'houselaxmicloth_coupons') setCoupons(db.getCoupons());
+      else if (e.key === 'houselaxmicloth_payments') setPayments(db.getPayments());
+      else if (e.key === 'houselaxmicloth_returns') setReturns(db.getReturns());
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
@@ -41,6 +45,8 @@ export function DataProvider({ children }) {
     const unsubReviews = listenFromFirestore('houselaxmicloth_reviews', setReviews);
     const unsubMessages = listenFromFirestore('houselaxmicloth_messages', setMessages);
     const unsubCoupons = listenFromFirestore('houselaxmicloth_coupons', setCoupons);
+    const unsubPayments = listenFromFirestore('houselaxmicloth_payments', setPayments);
+    const unsubReturns = listenFromFirestore('houselaxmicloth_returns', setReturns);
 
     return () => {
       unsubProducts();
@@ -49,6 +55,8 @@ export function DataProvider({ children }) {
       unsubReviews();
       unsubMessages();
       unsubCoupons();
+      unsubPayments();
+      unsubReturns();
     };
   }, []);
 
@@ -198,6 +206,82 @@ export function DataProvider({ children }) {
     );
   };
 
+  // ----- payment audit log -----
+  // Every payment attempt/callback is recorded here (client-side, since the
+  // order book is client-side). Admins see it in Admin → Payments.
+  const logPayment = (entry) => {
+    const e = {
+      id: db.uid('PAY-'),
+      at: new Date().toISOString(),
+      ...(entry || {}),
+    };
+    const next = [e, ...payments];
+    setPayments(next);
+    db.savePayments(next);
+    return e;
+  };
+
+  // ----- returns (reverse pickup) -----
+  const RETURN_ACTIVE = ['requested', 'approved', 'picked', 'received'];
+  const activeReturnForOrder = (orderId) =>
+    returns.find((r) => r.orderId === orderId && RETURN_ACTIVE.includes(r.status));
+
+  const addReturnRequest = ({ order, items, reason, note, user }) => {
+    if (activeReturnForOrder(order.id)) return null;
+    const ret = {
+      id: db.uid('RET-'),
+      orderId: order.id,
+      userId: user?.id || null,
+      customerName: order.customer?.name || user?.name || '',
+      email: order.customerEmail || user?.email || '',
+      phone: order.customer?.phone || user?.phone || '',
+      items,
+      reason,
+      note: String(note || '').slice(0, 300),
+      status: 'requested', // requested → approved → picked → received → refunded
+      requestDate: new Date().toISOString(),
+    };
+    const next = [ret, ...returns];
+    setReturns(next);
+    db.saveReturns(next);
+    return ret;
+  };
+
+  const updateReturnStatus = (id, status, meta = {}) => {
+    const now = new Date().toISOString();
+    let target = null;
+    const next = returns.map((r) => {
+      if (r.id !== id) return r;
+      target = { ...r, status, ...(meta || {}), updatedAt: now };
+      return target;
+    });
+    setReturns(next);
+    db.saveReturns(next);
+    if (!target) return null;
+
+    // Items are back in the warehouse → restock & mark the order "returned".
+    if (status === 'received') {
+      adjustStock(target.items || [], +1);
+      const orderNext = orders.map((o) =>
+        o.id === target.orderId && o.status !== 'returned'
+          ? {
+              ...o,
+              status: 'returned',
+              statusHistory: [
+                ...(o.statusHistory || []),
+                { status: 'returned', label: 'Return received & restocked', at: now },
+              ],
+            }
+          : o
+      );
+      if (orderNext !== orders) {
+        setOrders(orderNext);
+        db.saveOrders(orderNext);
+      }
+    }
+    return target;
+  };
+
   // ----- order helpers -----
   // Adjust product stock by delta per item quantity (clamped at 0).
   // Called with -1 when an order is placed and +1 when it is cancelled,
@@ -220,8 +304,15 @@ export function DataProvider({ children }) {
   };
 
   const placeOrder = (payload) => {
+    // Idempotent guard: a repeated submit (double-click, retry, replay) with
+    // the same client token returns the SAME order instead of creating a twin.
+    if (payload.clientToken) {
+      const existing = orders.find((o) => o.clientToken === payload.clientToken);
+      if (existing) return existing;
+    }
     const order = {
       id: db.uid('ORD-'),
+      clientToken: payload.clientToken || null,
       orderDate: new Date().toISOString(),
       userId: payload.userId || null,
       customerEmail:
@@ -460,8 +551,14 @@ export function DataProvider({ children }) {
       deleteCoupon,
       toggleCoupon,
       validateCoupon,
+      payments,
+      logPayment,
+      returns,
+      addReturnRequest,
+      updateReturnStatus,
+      activeReturnForOrder,
     }),
-    [products, orders, settings, reviews, messages, coupons]
+    [products, orders, settings, reviews, messages, coupons, payments, returns]
   );
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

@@ -17,6 +17,8 @@ const KEYS = {
   reviews: 'houselaxmicloth_reviews',
   messages: 'houselaxmicloth_messages',
   coupons: 'houselaxmicloth_coupons',
+  payments: 'houselaxmicloth_payments',
+  returns: 'houselaxmicloth_returns',
 
 };
 
@@ -170,6 +172,11 @@ const DEFAULT_SETTINGS = {
   razorpayKeyId: 'rzp_test_TYAM6GyacLBRrL',
   paymentMode: 'demo',
     freeShippingThreshold: 1499,
+  // Empty list = deliver everywhere (India). Enter pincodes in Admin → Settings
+  // to restrict service areas. Delivery promise in days (min–max window).
+  serviceablePincodes: [],
+  deliveryMinDays: 4,
+  deliveryMaxDays: 7,
 };
 
 function seedSettings() {
@@ -277,6 +284,24 @@ export const db = {
   saveCoupons(c) {
     write(KEYS.coupons, c);
     syncToFirestore(KEYS.coupons, c);
+  },
+
+  // payments: audit log of every payment attempt/callback
+  getPayments() {
+    return read(KEYS.payments, []);
+  },
+  savePayments(p) {
+    write(KEYS.payments, p);
+    syncToFirestore(KEYS.payments, p);
+  },
+
+  // returns: customer return requests + reverse-pickup state
+  getReturns() {
+    return read(KEYS.returns, []);
+  },
+  saveReturns(r) {
+    write(KEYS.returns, r);
+    syncToFirestore(KEYS.returns, r);
   },
 
   uid,

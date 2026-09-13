@@ -186,6 +186,7 @@ function StaffRoleForm({ setUserRole }) {
 export default function Admin() {
   const { user, isAdmin, isStaff, setUserRole } = useAuth();
   const { products, orders, settings, updateSettings, addProduct, updateProduct, deleteProduct, updateOrderStatus, coupons, addCoupon, deleteCoupon, toggleCoupon } = useData();
+  const { payments, returns, updateReturnStatus } = useData();
   const [tab, setTab] = useState(isAdmin ? 'products' : 'orders');
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
@@ -392,6 +393,16 @@ export default function Admin() {
         {isAdmin && (
           <button className={tab === 'coupons' ? 'chip active' : 'chip'} onClick={() => setTab('coupons')}>
             Coupons {coupons.length ? `(${coupons.length})` : ''}
+          </button>
+        )}
+        {isAdmin && (
+          <button className={tab === 'returns' ? 'chip active' : 'chip'} onClick={() => setTab('returns')}>
+            Returns {returns.length ? `(${returns.length})` : ''}
+          </button>
+        )}
+        {isAdmin && (
+          <button className={tab === 'payments' ? 'chip active' : 'chip'} onClick={() => setTab('payments')}>
+            Payments
           </button>
         )}
         {isAdmin && (
@@ -678,7 +689,84 @@ export default function Admin() {
         </>
       )}
 
-    {tab === 'settings' && (
+    {tab === 'returns' && (
+        <section className="card-box">
+          <h2>Return requests</h2>
+          {returns.length === 0 ? (
+            <p className="muted">
+              No returns yet. Customers request returns from their order page; reverse pickup is booked with Delhivery automatically.
+            </p>
+          ) : (
+            <div className="table-scroll">
+              <table className="table">
+                <thead>
+                  <tr><th>Return</th><th>Order</th><th>Customer</th><th>Items</th><th>Reason</th><th>Status / AWB</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                  {returns.map((r) => (
+                    <tr key={r.id}>
+                      <td><strong>{r.id}</strong><br /><span className="muted tiny">{formatDateTime(r.requestDate)}</span></td>
+                      <td>{r.orderId}</td>
+                      <td>{r.customerName}<br /><span className="muted tiny">{r.phone}</span></td>
+                      <td><span className="muted tiny">{r.items.map((it) => `${it.name}${it.size ? ` (${it.size})` : ''} ×${it.qty}`).join(', ')}</span></td>
+                      <td>{r.reason}{r.note ? <span className="muted tiny"><br />{r.note}</span> : null}</td>
+                      <td>
+                        <span className={`status-badge ${r.status}`}>{r.status.toUpperCase()}</span>
+                        {r.pickupAwb ? <span className="muted tiny"><br />AWB {r.pickupAwb}</span> : null}
+                      </td>
+                      <td className="row-gap">
+                        {r.status === 'requested' && <button className="btn btn-sm" onClick={() => updateReturnStatus(r.id, 'approved')}>Approve pickup</button>}
+                        {r.status === 'approved' && <button className="btn btn-sm" onClick={() => updateReturnStatus(r.id, 'picked')}>Mark picked</button>}
+                        {r.status === 'picked' && <button className="btn btn-sm" onClick={() => updateReturnStatus(r.id, 'received')}>Mark received</button>}
+                        {r.status === 'received' && <button className="btn btn-sm" onClick={() => updateReturnStatus(r.id, 'refunded')}>Mark refunded</button>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {tab === 'payments' && (
+        <section className="card-box">
+          <h2>Payment log</h2>
+          <p className="muted small">
+            Every payment attempt/callback is recorded when an order is placed. ✓ = Razorpay signature verified server-side.
+          </p>
+          {payments.length === 0 ? (
+            <p className="muted">No payments recorded yet.</p>
+          ) : (
+            <div className="table-scroll">
+              <table className="table">
+                <thead>
+                  <tr><th>When</th><th>Order</th><th>Gateway</th><th>Mode</th><th>Ref</th><th>Verified</th><th>Amount</th></tr>
+                </thead>
+                <tbody>
+                  {payments.map((p) => (
+                    <tr key={p.id}>
+                      <td>{formatDateTime(p.at)}</td>
+                      <td>{p.orderId || '—'}</td>
+                      <td>{p.gateway || p.method || '—'}</td>
+                      <td>{p.mode || '—'}</td>
+                      <td>{String(p.ref || '').slice(0, 22)}</td>
+                      <td>
+                        {p.gateway === 'Razorpay'
+                          ? (p.verified ? <span className="ok">✓ verified</span> : <span className="muted">not verified</span>)
+                          : <span className="muted">n/a</span>}
+                      </td>
+                      <td>{p.amount ? formatINR(p.amount) : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {tab === 'settings' && (
         <section className="card-box">
           <h2>Store settings</h2>
           <p className="muted">These changes are applied across the site instantly.</p>
@@ -786,6 +874,28 @@ export default function Admin() {
                 />
                 <span className="muted tiny">The banner disappears automatically the moment this time passes — on every visitor's screen. Save settings to apply.</span>
               </label>
+            </div>
+
+            <div className="flash-sale-settings">
+              <h3 style={{ margin: '6px 0 10px' }}>🚚 Delivery & pincodes</h3>
+              <label>Serviceable pincodes (one per line, 6-digit)
+                <textarea
+                  rows="4"
+                  value={(s.serviceablePincodes || []).join('\n')}
+                  onChange={(e) => setS({ ...s, serviceablePincodes: e.target.value.split(/[\s,]+/).map((x) => x.trim()).filter((x) => /^\d{6}$/.test(x)) })}
+                  placeholder={'124507\n110001\n560001'}
+                />
+                <span className="muted tiny">Checkout blocks pincodes not listed here. Empty = deliver everywhere in India.</span>
+              </label>
+              <div className="grid2">
+                <label>Earliest delivery (days from today)
+                  <input type="number" min="1" value={s.deliveryMinDays || 4} onChange={setSField('deliveryMinDays')} />
+                </label>
+                <label>Latest delivery (days from today)
+                  <input type="number" min="1" value={s.deliveryMaxDays || 7} onChange={setSField('deliveryMaxDays')} />
+                </label>
+              </div>
+              <p className="muted tiny">The checkout shows e.g. <strong>"Expected delivery Mon, 15 Sep – Thu, 18 Sep"</strong> once a valid, serviceable pincode is entered.</p>
             </div>
             <div className="pay-mode-row">
               <label style={{ display: 'block', marginBottom: 4 }}>Payment mode</label>
