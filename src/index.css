@@ -1082,6 +1082,17 @@ p { margin: 0 0 .8em; }
 .discount-line { color: #2e8a5a; }
 .discount-line span:last-child { font-weight: 700; }
 
+/* ── Shipping details (packed / shipped / delivered) ── */
+.shipping-details { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: #fafafa; }
+.shipping-details h4 { margin: 0 0 10px; font-size: 1rem; display: flex; align-items: center; gap: 8px; }
+.shipping-address { font-size: .92rem; line-height: 1.5; }
+.shipping-address .name { font-weight: 700; }
+.shipping-meta { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; font-size: .85rem; color: #666; }
+.shipping-meta span { display: flex; align-items: center; gap: 4px; }
+.shipping-next { margin-top: 10px; padding: 10px 14px; background: #fff3cd; border-radius: 8px; font-size: .88rem; color: #856404; }
+.packed-ready { margin-top: 10px; padding: 10px 14px; background: #d4edda; border-radius: 8px; font-size: .88rem; color: #155724; }
+.packed-ready::before { content: '✓ '; font-weight: 700; }
+
 /* ── Product page: size guide + share ────────────── */
 .buy-extras {
   display: flex;

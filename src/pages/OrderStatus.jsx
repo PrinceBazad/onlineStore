@@ -5,15 +5,28 @@ import { useAuth } from '../context/AuthContext.jsx';
 
 import { formatINR, formatDateTime } from '../utils/format.js';
 import { fetchDelhiveryTrack, isDelhiveryOrder } from '../utils/delhivery.js';
-
-
 const ORD_TIMELINE = [
-  { status: 'placed', label: 'Order Placed' },
-  { status: 'confirmed', label: 'Confirmed' },
-  { status: 'packed', label: 'Packed' },
-  { status: 'shipped', label: 'Shipped' },
-  { status: 'delivered', label: 'Delivered' },
+  { status: 'placed', label: 'Order Placed', icon: '📋' },
+  { status: 'confirmed', label: 'Confirmed', icon: '✅' },
+  { status: 'packed', label: 'Packed', icon: '📦' },
+  { status: 'shipped', label: 'Shipped', icon: '🚚' },
+  { status: 'delivered', label: 'Delivered', icon: '🎉' },
 ];
+
+// Friendly descriptions for each courier scan status.
+const SCAN_MEANINGS = {
+  'pickup': 'Parcel picked up from seller',
+  'in transit': 'Parcel is on the move',
+  'out for delivery': 'Parcel is out for delivery today — keep your phone nearby!',
+  'delivered': 'Parcel delivered successfully',
+  'rto': 'Return to sender initiated',
+  'undelivered': 'Delivery attempted — will try again',
+  'manifested': 'Shipment booked, awaiting pickup',
+};
+
+
+
+
 
 export default function OrderStatus() {
   const { user } = useAuth();
@@ -188,6 +201,38 @@ export default function OrderStatus() {
             })}
           </div>
 
+          {/* Shipping details — visible for packed / shipped / delivered */}
+          {['packed', 'shipped', 'delivered'].includes(order.status) && (
+            <div className="shipping-details">
+              <h4>🚚 Shipping details</h4>
+              <div className="shipping-address">
+                <div className="name">{order.customer?.name}</div>
+                <div>{order.shipping?.address}</div>
+                <div>{order.shipping?.city}, {order.shipping?.state} {order.shipping?.pincode}</div>
+              </div>
+              <div className="shipping-meta">
+                <span>📦 {order.items?.length} item{(order.items?.length || 0) > 1 ? 's' : ''}</span>
+                <span>💰 {order.payment?.mode === 'cod' ? 'Cash on Delivery' : `Paid via ${order.payment?.mode?.toUpperCase() || '—'}`}</span>
+                <span>📋 {formatINR(order.total)}</span>
+              </div>
+              {order.status === 'packed' && (
+                <div className="packed-ready">
+                  Your order has been packed and will be shipped soon — you'll get a tracking number once it's dispatched.
+                </div>
+              )}
+              {order.status === 'shipped' && !order.trackingNo && (
+                <div className="shipping-next">
+                  📦 Order shipped — tracking number will appear shortly.
+                </div>
+              )}
+              {order.status === 'delivered' && (
+                <div className="packed-ready">
+                  🎉 Your order has been delivered. Thank you for shopping with us!
+                </div>
+              )}
+            </div>
+          )}
+
           {order.status === 'shipped' || order.status === 'delivered' ? (
             <div className="card-box inner" style={{ marginTop: 14 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -227,14 +272,17 @@ export default function OrderStatus() {
                     Current: <strong>{courierTrack.status}</strong>
                   </p>
                   <ul className="audit-list">
-                    {courierTrack.scans.map((sc, i) => (
-                      <li key={i}>
-                        <strong>{sc.status}</strong>
-                        {sc.location ? ` · ${sc.location}` : ''}
-                        {sc.detail ? ` — ${sc.detail}` : ''}
-                        {sc.time ? <span className="muted"> · {formatDateTime(sc.time)}</span> : null}
-                      </li>
-                    ))}
+                    {courierTrack.scans.map((sc, i) => {
+                      const meaning = SCAN_MEANINGS[String(sc.status || '').toLowerCase().trim()] || '';
+                      return (
+                        <li key={i} style={{ fontWeight: i === 0 ? 700 : 400 }}>
+                          <strong>{sc.status}</strong>
+                          {meaning ? ` — ${meaning}` : ''}
+                          {sc.location ? ` · ${sc.location}` : ''}
+                          {sc.time ? <span className="muted"> · {formatDateTime(sc.time)}</span> : null}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </>
               )}
@@ -256,13 +304,46 @@ export default function OrderStatus() {
             <div className="card-box inner">
               <h3>Payment</h3>
               <p><strong>{order.payment.mode}</strong> · {order.payment.status === 'paid' ? 'Paid' : 'Pending (COD)'}</p>
-              <h3 className="m-top">Ship to</h3>
+            </div>
+
+            {/* ── Shipping details ── */}
+            <div className="card-box inner">
+              <h3>🚚 Shipping details</h3>
+              <p style={{ fontWeight: 600 }}>{order.customer?.name}</p>
               <p>
-                {order.customer?.name}<br />
-                {order.shipping?.address}, {order.shipping?.city},<br />
-                {order.shipping?.state} — {order.shipping?.pincode}
+                {order.shipping?.address}<br />
+                {order.shipping?.city}, {order.shipping?.state} — {order.shipping?.pincode}
               </p>
-              <p className="muted">{order.customer?.phone}</p>
+              <p className="muted">📞 {order.customer?.phone}</p>
+              {order.trackingNo ? (
+                <div className="ship-track">
+                  <div className="ship-track-row">
+                    <span className="muted tiny">Courier</span>
+                    <strong>{order.courier || 'Delhivery'}</strong>
+                  </div>
+                  <div className="ship-track-row">
+                    <span className="muted tiny">Tracking number</span>
+                    <strong className="track-no">{order.trackingNo}</strong>
+                  </div>
+                  {order.delhivery?.expectedDelivery && (
+                    <div className="ship-track-row">
+                      <span className="muted tiny">Expected delivery</span>
+                      <strong>{order.delhivery.expectedDelivery}</strong>
+                    </div>
+                  )}
+                  <a
+                    className="btn btn-sm btn-gold track-external"
+                    href={`https://delhivery.com/track/package/${order.trackingNo}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    📍 Track on Delhivery
+                  </a>
+                  <p className="muted tiny track-hint">See live location on Delhivery's website</p>
+                </div>
+              ) : (
+                <p className="muted tiny">Tracking number will be added once the order is shipped.</p>
+              )}
             </div>
           </div>
 
