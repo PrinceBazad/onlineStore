@@ -45,10 +45,26 @@ export async function firestoreGet(collection, docId) {
   }
 }
 
+// Recursively strip Firestore-invalid values (undefined → null, NaN → null).
+// Firestore accepts null but throws "Unsupported field value: undefined".
+function sanitizeForFirestore(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'number' && !Number.isFinite(value)) return null;
+  if (Array.isArray(value)) return value.map(sanitizeForFirestore);
+  if (typeof value === 'object') {
+    const out = {};
+    for (const k of Object.keys(value)) {
+      out[k] = sanitizeForFirestore(value[k]);
+    }
+    return out;
+  }
+  return value;
+}
+
 export async function firestoreSet(collection, docId, data) {
   if (!db) return false;
   try {
-    await setDoc(doc(db, collection, docId), data, { merge: true });
+    await setDoc(doc(db, collection, docId), sanitizeForFirestore(data), { merge: true });
     return true;
   } catch (err) {
     console.warn('firestoreSet error:', err.message);
